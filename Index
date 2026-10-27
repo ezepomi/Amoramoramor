@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Nuestros planes ✨❤️</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Fonts: Outfit (Limpia/Redondeada) y Caveat (Cursiva Cute) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Firebase Compat SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
+    <!-- React & Babel -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: #FDFBF7;
+            color: #4A3E3D;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .font-cursive {
+            font-family: 'Caveat', cursive;
+        }
+        @keyframes heartPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.25); }
+        }
+        .animate-heart-1 { animation: heartPulse 1.4s infinite ease-in-out; }
+        .animate-heart-2 { animation: heartPulse 1.4s infinite ease-in-out 0.2s; }
+        .animate-heart-3 { animation: heartPulse 1.4s infinite ease-in-out 0.4s; }
+        .soft-shadow { box-shadow: 0 4px 20px -2px rgba(0,0,0,0.05); }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // 👇 ¡REEMPLAZÁ ESTO CON TUS CREDENCIALES DE FIREBASE! 👇
+        const firebaseConfig = {
+            apiKey: "TU_API_KEY",
+            authDomain: "tu-proyecto.firebaseapp.com",
+            projectId: "tu-proyecto",
+            storageBucket: "tu-proyecto.appspot.com",
+            messagingSenderId: "1234567890",
+            appId: "1:1234567890:web:abcdef123456"
+        };
+
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        const googleProvider = new firebase.auth.GoogleAuthProvider();
+
+        const FRASES_CARGA = [
+            "Caemos en la misma nota, al mismo tiempo. ✨",
+            "Por ti, baby, sería Batman. 🦇❤️",
+            "No soy muy inteligente pero sé lo que es el amor. 🧸"
+        ];
+
+        const CATEGORIAS = [
+            { id: 'pelis', titulo: 'Pelis & Series', icono: '🎬', color: 'bg-[#EAE4F2]', text: 'text-[#5B4870]' },
+            { id: 'lugares', titulo: 'Lugares por Visitar', icono: '📍', color: 'bg-[#FBE8DB]', text: 'text-[#825435]' },
+            { id: 'espectaculos', titulo: 'Espectáculos', icono: '🎟️', color: 'bg-[#E2F0D9]', text: 'text-[#416132]' },
+            { id: 'comer', titulo: 'Salir a Comer', icono: '🍽️', color: 'bg-[#FCF4DD]', text: 'text-[#7A6221]' },
+            { id: 'cocinar', titulo: 'Para Cocinar', icono: '👨‍🍳', color: 'bg-[#FCE2E6]', text: 'text-[#823A46]' }
+        ];
+
+        const App = () => {
+            const [user, setUser] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const [fraseActual, setFraseActual] = useState("");
+            const [categoria, setCategoria] = useState(null);
+            const [planes, setPlanes] = useState([]);
+            const [planSeleccionado, setPlanSeleccionado] = useState(null);
+            
+            // Formularios
+            const [mostrarForm, setMostrarForm] = useState(false);
+            const [nuevoPlan, setNuevoPlan] = useState({ titulo: '', detalle: '' });
+            const [miResena, setMiResena] = useState({ puntaje: 5, comentario: '', estado: 'Hecho' });
+
+            useEffect(() => {
+                setFraseActual(FRASES_CARGA[Math.floor(Math.random() * FRASES_CARGA.length)]);
+                const unsubscribe = auth.onAuthStateChanged((u) => {
+                    setUser(u);
+                    setTimeout(() => setLoading(false), 2500); // 2.5s para disfrutar la pantalla de carga
+                });
+                return () => unsubscribe();
+            }, []);
+
+            // Escuchar planes de la categoría seleccionada
+            useEffect(() => {
+                if (!user || !categoria) return;
+                const unsub = db.collection('planes')
+                    .where('categoria', '==', categoria.id)
+                    .orderBy('fechaCreacion', 'desc')
+                    .onSnapshot(snapshot => {
+                        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        setPlanes(data);
+                    });
+                return () => unsub();
+            }, [categoria, user]);
+
+            const login = () => auth.signInWithPopup(googleProvider).catch(err => alert(err.message));
+            const logout = () => auth.signOut();
+
+            const guardarPlan = async (e) => {
+                e.preventDefault();
+                if (!nuevoPlan.titulo) return;
+                await db.collection('planes').add({
+                    categoria: categoria.id,
+                    titulo: nuevoPlan.titulo,
+                    detalle: nuevoPlan.detalle,
+                    fechaCreacion: firebase.firestore.FieldValue.serverTimestamp(),
+                    creadoPor: user.displayName,
+                    resenas: {} // Empieza sin reseñas
+                });
+                setNuevoPlan({ titulo: '', detalle: '' });
+                setMostrarForm(false);
+            };
+
+            const guardarResena = async (e) => {
+                e.preventDefault();
+                const planRef = db.collection('planes').doc(planSeleccionado.id);
+                // Usamos el UID del usuario como llave para no sobreescribir la del otro
+                await planRef.set({
+                    resenas: {
+                        [user.uid]: {
+                            nombre: user.displayName.split(' ')[0], // Solo el primer nombre
+                            puntaje: miResena.puntaje,
+                            comentario: miResena.comentario,
+                            estado: miResena.estado
+                        }
+                    }
+                }, { merge: true });
+                
+                // Actualizar vista local
+                const updatedPlan = {
+                    ...planSeleccionado,
+                    resenas: {
+                        ...planSeleccionado.resenas,
+                        [user.uid]: { nombre: user.displayName.split(' ')[0], puntaje: miResena.puntaje, comentario: miResena.comentario, estado: miResena.estado }
+                    }
+                };
+                setPlanSeleccionado(updatedPlan);
+                alert("¡Tu valoración se guardó con éxito! ✨");
+            };
+
+            // 1. PANTALLA DE CARGA
+            if (loading) return (
+                <div className="min-h-screen flex flex-col justify-between items-center p-8 text-center select-none">
+                    <div className="pt-12"><span className="text-sm font-semibold text-[#B39283] tracking-widest uppercase">Nuestros Planes</span></div>
+                    <div className="flex flex-col items-center gap-6">
+                        <div className="flex items-center justify-center gap-3">
+                            <span className="text-3xl animate-heart-1">🌸</span>
+                            <span className="text-5xl animate-heart-2">💖</span>
+                            <span className="text-3xl animate-heart-3">✨</span>
+                        </div>
+                        <p className="text-lg font-medium text-[#6E5A58] max-w-xs leading-relaxed italic">"{fraseActual}"</p>
+                    </div>
+                    <div className="pb-6"><span className="font-cursive text-5xl text-[#D88A8A] font-bold tracking-wider">J&E</span></div>
+                </div>
+            );
+
+            // 2. PANTALLA DE LOGIN
+            if (!user) return (
+                <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center">
+                    <div className="w-full max-w-sm bg-white p-8 rounded-[2.5rem] soft-shadow space-y-6">
+                        <div className="text-5xl">✨❤️</div>
+                        <h1 className="text-2xl font-bold">Nuestros planes</h1>
+                        <p className="text-sm text-[#8C7A78]">Iniciá sesión para guardar y organizar nuestras citas juntos.</p>
+                        <button onClick={login} className="w-full bg-[#E8A598] text-white py-4 rounded-full font-semibold shadow-md active:scale-95 transition-all">Ingresar con Google</button>
+                    </div>
+                    <span className="font-cursive text-4xl text-[#D88A8A] font-bold mt-8">J&E</span>
+                </div>
+            );
+
+            // 3. DETALLE DEL PLAN Y RESEÑAS CRUZADAS
+            if (planSeleccionado) {
+                const resenas = planSeleccionado.resenas ? Object.values(planSeleccionado.resenas) : [];
+                const miResenaActual = planSeleccionado.resenas && planSeleccionado.resenas[user.uid];
+                
+                // Calcular promedio de la pareja
+                const ratingPareja = resenas.length > 0 
+                    ? (resenas.reduce((acc, r) => acc + r.puntaje, 0) / resenas.length).toFixed(1) 
+                    : null;
+
+                return (
+                    <div className="min-h-screen p-5 max-w-md mx-auto">
+                        <button onClick={() => setPlanSeleccionado(null)} className="text-sm font-bold text-[#8C7A78] bg-white px-4 py-2 rounded-full mb-4 soft-shadow">⬅ Volver</button>
+                        
+                        <div className="bg-white p-6 rounded-[2.5rem] soft-shadow mb-6 text-center">
+                            <span className="text-4xl block mb-2">{categoria.icono}</span>
+                            <h2 className="text-2xl font-bold text-[#4A3E3D]">{planSeleccionado.titulo}</h2>
+                            <p className="text-[#8C7A78] mt-1">{planSeleccionado.detalle}</p>
+                            
+                            {ratingPareja && (
+                                <div className="mt-4 bg-[#FFF0F2] inline-block px-4 py-2 rounded-full text-[#D88A8A] font-bold text-sm">
+                                    💕 Rating de la pareja: {ratingPareja} / 5
+                                </div>
+                            )}
+                        </div>
+
+                        {/* SECCIÓN DE RESEÑAS CRUZADAS */}
+                        <div className="space-y-4 mb-8">
+                            <h3 className="font-bold text-lg text-[#4A3E3D] ml-2">Nuestras Opiniones ✨</h3>
+                            
+                            {resenas.length === 0 && <p className="text-sm text-[#8C7A78] ml-2 italic">Aún no hay reseñas. ¡Sé el primero en opinar!</p>}
+                            
+                            {resenas.map((r, idx) => (
+                                <div key={idx} className="bg-white p-5 rounded-3xl soft-shadow border border-[#F2E8E1]">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <span className="font-bold text-[#4A3E3D]">{r.nombre}</span>
+                                        <span className="text-[#D88A8A] text-sm font-bold">{r.estado}</span>
+                                    </div>
+                                    <div className="text-[#FBBF24] mb-2">{"⭐".repeat(r.puntaje)}</div>
+                                    <p className="text-sm text-[#6E5A58] italic">"{r.comentario}"</p>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* FORMULARIO DE MI RESEÑA */}
+                        <div className="bg-white p-6 rounded-[2.5rem] soft-shadow border-2 border-[#F7EFEA]">
+                            <h3 className="font-bold text-[#4A3E3D] mb-4">{miResenaActual ? "Editar mi valoración" : "Dejar mi valoración"}</h3>
+                            <form onSubmit={guardarResena} className="space-y-4">
+                                <select value={miResena.estado} onChange={e=>setMiResena({...miResena, estado: e.target.value})} className="w-full bg-[#FDFBF7] border-none p-4 rounded-2xl text-sm font-bold outline-none text-[#4A3E3D]">
+                                    <option value="Pendiente">⏳ Pendiente (Aún no fui/lo vi)</option>
+                                    <option value="Hecho">✅ Hecho</option>
+                                </select>
+                                
+                                {miResena.estado === 'Hecho' && (
+                                    <>
+                                        <div>
+                                            <label className="text-xs font-bold text-[#8C7A78] ml-2">Mi Puntaje (1 a 5)</label>
+                                            <input type="number" min="1" max="5" value={miResena.puntaje} onChange={e=>setMiResena({...miResena, puntaje: Number(e.target.value)})} className="w-full bg-[#FDFBF7] p-4 rounded-2xl text-lg font-bold outline-none text-center text-[#4A3E3D]" />
+                                        </div>
+                                        <textarea placeholder="¿Qué te pareció?" value={miResena.comentario} onChange={e=>setMiResena({...miResena, comentario: e.target.value})} className="w-full bg-[#FDFBF7] p-4 rounded-2xl text-sm outline-none text-[#4A3E3D] resize-none" rows="3" required></textarea>
+                                    </>
+                                )}
+                                <button type="submit" className="w-full bg-[#B39283] text-white py-4 rounded-2xl font-bold shadow-md active:scale-95 transition-all">Guardar Opinión</button>
+                            </form>
+                        </div>
+                    </div>
+                );
+            }
+
+            // 4. VISTA DE LISTA DE CATEGORÍA
+            if (categoria) return (
+                <div className="min-h-screen p-5 max-w-md mx-auto">
+                    <header className="flex items-center justify-between mb-6">
+                        <button onClick={() => setCategoria(null)} className="text-sm font-bold text-[#8C7A78] bg-white px-4 py-2 rounded-full soft-shadow">⬅ Inicio</button>
+                        <div className={`px-4 py-2 rounded-full ${categoria.color} ${categoria.text} font-bold text-sm flex items-center gap-2`}>
+                            {categoria.icono} {categoria.titulo}
+                        </div>
+                    </header>
+
+                    {!mostrarForm ? (
+                        <>
+                            <div className="space-y-3 mb-6">
+                                {planes.length === 0 ? (
+                                    <div className="text-center p-8 bg-white rounded-3xl soft-shadow text-[#8C7A78] text-sm">No hay planes acá todavía. ¡Agregá uno!</div>
+                                ) : (
+                                    planes.map(plan => {
+                                        // Saber el estado de este plan para MI cuenta
+                                        const miEstado = plan.resenas && plan.resenas[user.uid] ? plan.resenas[user.uid].estado : 'Pendiente';
+                                        return (
+                                            <div key={plan.id} onClick={() => setPlanSeleccionado(plan)} className="bg-white p-5 rounded-3xl soft-shadow flex justify-between items-center cursor-pointer active:scale-98 transition-all">
+                                                <div>
+                                                    <h3 className="font-bold text-[#4A3E3D] text-lg">{plan.titulo}</h3>
+                                                    <p className="text-xs text-[#8C7A78] mt-1">{plan.detalle}</p>
+                                                </div>
+                                                <div className={`text-xs font-bold px-3 py-1 rounded-full ${miEstado === 'Hecho' ? 'bg-[#E2F0D9] text-[#416132]' : 'bg-[#F2E8E1] text-[#8C7A78]'}`}>
+                                                    {miEstado}
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
+                            <button onClick={() => setMostrarForm(true)} className="w-full bg-[#4A3E3D] text-[#FDFBF7] py-4 rounded-full font-bold shadow-lg active:scale-95 transition-all text-lg flex items-center justify-center gap-2">
+                                <span>+</span> Agregar un Plan
+                            </button>
+                        </>
+                    ) : (
+                        <div className="bg-white p-6 rounded-[2.5rem] soft-shadow border-2 border-[#F7EFEA]">
+                            <h3 className="font-bold text-[#4A3E3D] text-lg mb-4 text-center">Nuevo Plan 💖</h3>
+                            <form onSubmit={guardarPlan} className="space-y-4">
+                                <div>
+                                    <label className="text-xs font-bold text-[#8C7A78] ml-2">Nombre (Peli, Lugar, Plato, etc)</label>
+                                    <input type="text" autoFocus value={nuevoPlan.titulo} onChange={e=>setNuevoPlan({...nuevoPlan, titulo: e.target.value})} className="w-full bg-[#FDFBF7] p-4 rounded-2xl text-sm font-bold outline-none text-[#4A3E3D] mt-1" required />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-[#8C7A78] ml-2">Detalles (Plataforma, Ubicación, etc)</label>
+                                    <input type="text" value={nuevoPlan.detalle} onChange={e=>setNuevoPlan({...nuevoPlan, detalle: e.target.value})} className="w-full bg-[#FDFBF7] p-4 rounded-2xl text-sm outline-none text-[#4A3E3D] mt-1" />
+                                </div>
+                                <div className="flex gap-3 pt-2">
+                                    <button type="button" onClick={() => setMostrarForm(false)} className="flex-1 bg-[#F2E8E1] text-[#8C7A78] py-4 rounded-2xl font-bold">Cancelar</button>
+                                    <button type="submit" className="flex-1 bg-[#E8A598] text-white py-4 rounded-2xl font-bold shadow-md">Guardar</button>
+                                </div>
+                            </form>
+                        </div>
+                    )}
+                </div>
+            );
+
+            // 5. MENÚ PRINCIPAL
+            return (
+                <div className="min-h-screen pb-12 px-5 max-w-md mx-auto">
+                    <header className="pt-8 pb-6 flex items-center justify-between">
+                        <div>
+                            <h1 className="text-2xl font-bold text-[#4A3E3D] flex items-center gap-2">Nuestros planes ✨❤️</h1>
+                            <p className="text-xs text-[#8C7A78] mt-1">¿Qué hacemos hoy, {user.displayName.split(' ')[0]}?</p>
+                        </div>
+                        <button onClick={logout} className="text-xs font-bold text-[#B39283] bg-white px-3 py-2 rounded-full soft-shadow">Salir</button>
+                    </header>
+
+                    <div className="space-y-4">
+                        {CATEGORIAS.map(cat => (
+                            <div key={cat.id} onClick={() => setCategoria(cat)} className={`${cat.color} p-5 rounded-[2rem] cursor-pointer soft-shadow hover:shadow-md transition-all active:scale-95 flex items-center justify-between`}>
+                                <div className="flex items-center gap-4">
+                                    <div className="text-3xl bg-white/60 p-3 rounded-2xl soft-shadow">{cat.icono}</div>
+                                    <div>
+                                        <h2 className={`font-bold text-lg ${cat.text}`}>{cat.titulo}</h2>
+                                        <p className="text-xs text-[#7A6B69] font-medium opacity-80">Ver y organizar</p>
+                                    </div>
+                                </div>
+                                <span className={`text-xl ${cat.text} opacity-50`}>➔</span>
+                            </div>
+                        ))}
+                        <div className="text-center pt-8"><span className="font-cursive text-5xl text-[#D88A8A] font-bold tracking-widest opacity-80">J&E</span></div>
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>
