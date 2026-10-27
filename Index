@@ -8,7 +8,7 @@
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
 
-    <!-- Google Fonts: Outfit (Limpia/Redondeada) y Caveat (Cursiva Cute) -->
+    <!-- Google Fonts: Outfit y Caveat -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -89,7 +89,6 @@
             const [planes, setPlanes] = useState([]);
             const [planSeleccionado, setPlanSeleccionado] = useState(null);
             
-            // Formularios
             const [mostrarForm, setMostrarForm] = useState(false);
             const [nuevoPlan, setNuevoPlan] = useState({ titulo: '', detalle: '' });
             const [miResena, setMiResena] = useState({ puntaje: 5, comentario: '', estado: 'Hecho' });
@@ -98,12 +97,11 @@
                 setFraseActual(FRASES_CARGA[Math.floor(Math.random() * FRASES_CARGA.length)]);
                 const unsubscribe = auth.onAuthStateChanged((u) => {
                     setUser(u);
-                    setTimeout(() => setLoading(false), 2500); // 2.5s para disfrutar la pantalla de carga
+                    setTimeout(() => setLoading(false), 2500);
                 });
                 return () => unsubscribe();
             }, []);
 
-            // Escuchar planes de la categoría seleccionada
             useEffect(() => {
                 if (!user || !categoria) return;
                 const unsub = db.collection('planes')
@@ -128,7 +126,7 @@
                     detalle: nuevoPlan.detalle,
                     fechaCreacion: firebase.firestore.FieldValue.serverTimestamp(),
                     creadoPor: user.displayName,
-                    resenas: {} // Empieza sin reseñas
+                    resenas: {}
                 });
                 setNuevoPlan({ titulo: '', detalle: '' });
                 setMostrarForm(false);
@@ -137,11 +135,10 @@
             const guardarResena = async (e) => {
                 e.preventDefault();
                 const planRef = db.collection('planes').doc(planSeleccionado.id);
-                // Usamos el UID del usuario como llave para no sobreescribir la del otro
                 await planRef.set({
                     resenas: {
                         [user.uid]: {
-                            nombre: user.displayName.split(' ')[0], // Solo el primer nombre
+                            nombre: user.displayName.split(' ')[0],
                             puntaje: miResena.puntaje,
                             comentario: miResena.comentario,
                             estado: miResena.estado
@@ -149,7 +146,6 @@
                     }
                 }, { merge: true });
                 
-                // Actualizar vista local
                 const updatedPlan = {
                     ...planSeleccionado,
                     resenas: {
@@ -161,7 +157,7 @@
                 alert("¡Tu valoración se guardó con éxito! ✨");
             };
 
-            // 1. PANTALLA DE CARGA
+            // PANTALLA DE CARGA
             if (loading) return (
                 <div className="min-h-screen flex flex-col justify-between items-center p-8 text-center select-none">
                     <div className="pt-12"><span className="text-sm font-semibold text-[#B39283] tracking-widest uppercase">Nuestros Planes</span></div>
@@ -177,7 +173,7 @@
                 </div>
             );
 
-            // 2. PANTALLA DE LOGIN
+            // LOGIN
             if (!user) return (
                 <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center">
                     <div className="w-full max-w-sm bg-white p-8 rounded-[2.5rem] soft-shadow space-y-6">
@@ -190,12 +186,9 @@
                 </div>
             );
 
-            // 3. DETALLE DEL PLAN Y RESEÑAS CRUZADAS
+            // DETALLE DEL PLAN Y RESEÑAS CRUZADAS
             if (planSeleccionado) {
                 const resenas = planSeleccionado.resenas ? Object.values(planSeleccionado.resenas) : [];
-                const miResenaActual = planSeleccionado.resenas && planSeleccionado.resenas[user.uid];
-                
-                // Calcular promedio de la pareja
                 const ratingPareja = resenas.length > 0 
                     ? (resenas.reduce((acc, r) => acc + r.puntaje, 0) / resenas.length).toFixed(1) 
                     : null;
@@ -216,12 +209,9 @@
                             )}
                         </div>
 
-                        {/* SECCIÓN DE RESEÑAS CRUZADAS */}
                         <div className="space-y-4 mb-8">
                             <h3 className="font-bold text-lg text-[#4A3E3D] ml-2">Nuestras Opiniones ✨</h3>
-                            
                             {resenas.length === 0 && <p className="text-sm text-[#8C7A78] ml-2 italic">Aún no hay reseñas. ¡Sé el primero en opinar!</p>}
-                            
                             {resenas.map((r, idx) => (
                                 <div key={idx} className="bg-white p-5 rounded-3xl soft-shadow border border-[#F2E8E1]">
                                     <div className="flex justify-between items-center mb-2">
@@ -234,9 +224,8 @@
                             ))}
                         </div>
 
-                        {/* FORMULARIO DE MI RESEÑA */}
                         <div className="bg-white p-6 rounded-[2.5rem] soft-shadow border-2 border-[#F7EFEA]">
-                            <h3 className="font-bold text-[#4A3E3D] mb-4">{miResenaActual ? "Editar mi valoración" : "Dejar mi valoración"}</h3>
+                            <h3 className="font-bold text-[#4A3E3D] mb-4">Dejar mi valoración</h3>
                             <form onSubmit={guardarResena} className="space-y-4">
                                 <select value={miResena.estado} onChange={e=>setMiResena({...miResena, estado: e.target.value})} className="w-full bg-[#FDFBF7] border-none p-4 rounded-2xl text-sm font-bold outline-none text-[#4A3E3D]">
                                     <option value="Pendiente">⏳ Pendiente (Aún no fui/lo vi)</option>
@@ -259,7 +248,7 @@
                 );
             }
 
-            // 4. VISTA DE LISTA DE CATEGORÍA
+            // LISTA DE CATEGORÍA
             if (categoria) return (
                 <div className="min-h-screen p-5 max-w-md mx-auto">
                     <header className="flex items-center justify-between mb-6">
@@ -276,7 +265,6 @@
                                     <div className="text-center p-8 bg-white rounded-3xl soft-shadow text-[#8C7A78] text-sm">No hay planes acá todavía. ¡Agregá uno!</div>
                                 ) : (
                                     planes.map(plan => {
-                                        // Saber el estado de este plan para MI cuenta
                                         const miEstado = plan.resenas && plan.resenas[user.uid] ? plan.resenas[user.uid].estado : 'Pendiente';
                                         return (
                                             <div key={plan.id} onClick={() => setPlanSeleccionado(plan)} className="bg-white p-5 rounded-3xl soft-shadow flex justify-between items-center cursor-pointer active:scale-98 transition-all">
@@ -318,7 +306,7 @@
                 </div>
             );
 
-            // 5. MENÚ PRINCIPAL
+            // MENÚ PRINCIPAL
             return (
                 <div className="min-h-screen pb-12 px-5 max-w-md mx-auto">
                     <header className="pt-8 pb-6 flex items-center justify-between">
