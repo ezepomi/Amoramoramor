@@ -109,14 +109,16 @@
             </button>
         );
 
-        const StarRating = ({ rating, setRating }) => (
+        // Componente de Estrellas Interactivo
+        const StarRating = ({ rating, setRating, readOnly = false }) => (
             <div className="flex gap-1 justify-center my-2">
                 {[1, 2, 3, 4, 5].map((star) => (
                     <button
                         key={star}
                         type="button"
-                        onClick={() => setRating(star)}
-                        className={`text-2xl transition-transform active:scale-125 ${star <= rating ? 'text-[#FBBF24]' : 'text-[#E5DCD6]'}`}
+                        disabled={readOnly}
+                        onClick={() => !readOnly && setRating(star)}
+                        className={`text-2xl transition-transform ${!readOnly ? 'active:scale-125 cursor-pointer' : 'cursor-default'} ${star <= rating ? 'text-[#FBBF24]' : 'text-[#E5DCD6]'}`}
                     >
                         ★
                     </button>
@@ -163,17 +165,37 @@
                 return () => unsubscribe();
             }, []);
 
+            // Cargar planes garantizando el aislamiento estricto por categoría
             useEffect(() => {
-                if (!user || !categoria) return;
+                if (!user || !categoria) {
+                    setPlanes([]);
+                    return;
+                }
+                setPlanes([]); // Limpiar lista anterior inmediatamente
                 const unsub = db.collection('planes')
                     .where('categoria', '==', categoria.id)
                     .orderBy('fechaCreacion', 'desc')
                     .onSnapshot(snapshot => {
                         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                         setPlanes(data);
-                    });
+                    }, error => console.error("Error al cargar planes:", error));
+
                 return () => unsub();
             }, [categoria, user]);
+
+            // Cargar datos de la reseña del usuario al abrir un plan
+            useEffect(() => {
+                if (planSeleccionado && user) {
+                    const miResenaActual = planSeleccionado.resenas && planSeleccionado.resenas[user.uid];
+                    if (miResenaActual) {
+                        setMiPuntaje(miResenaActual.puntaje || 5);
+                        setMiComentario(miResenaActual.comentario || '');
+                    } else {
+                        setMiPuntaje(5);
+                        setMiComentario('');
+                    }
+                }
+            }, [planSeleccionado, user]);
 
             const login = () => auth.signInWithPopup(googleProvider).catch(err => alert(err.message));
             const logout = () => auth.signOut();
@@ -195,9 +217,17 @@
                 setPlanEditando(null);
             };
 
+            const seleccionarCategoria = (cat) => {
+                setPlanSeleccionado(null);
+                setMostrarForm(false);
+                resetForm();
+                setFiltroEstado('todos');
+                setCategoria(cat);
+            };
+
             const guardarPlan = async (e) => {
                 e.preventDefault();
-                if (!formCampos.titulo) return;
+                if (!formCampos.titulo || !categoria) return;
 
                 const datosBase = {
                     categoria: categoria.id,
@@ -263,7 +293,7 @@
                 const estadoActual = miResenaActual ? miResenaActual.estado : 'Pendiente';
                 const nuevoEstado = estadoActual === 'Hecho' ? 'Pendiente' : 'Hecho';
 
-                await planRef.set({
+                const datosActualizados = {
                     resenas: {
                         [user.uid]: {
                             nombre: user.displayName.split(' ')[0],
@@ -272,7 +302,9 @@
                             estado: nuevoEstado
                         }
                     }
-                }, { merge: true });
+                };
+
+                await planRef.set(datosActualizados, { merge: true });
 
                 if (planSeleccionado && planSeleccionado.id === plan.id) {
                     setPlanSeleccionado(prev => ({
@@ -292,18 +324,22 @@
 
             const guardarResena = async (e) => {
                 e.preventDefault();
+                if (!planSeleccionado) return;
+
                 const planRef = db.collection('planes').doc(planSeleccionado.id);
                 const miResenaActual = planSeleccionado.resenas && planSeleccionado.resenas[user.uid];
-                const miEstadoActual = miResenaActual ? miResenaActual.estado : 'Hecho';
+                const miEstadoActual = miResenaActual ? miResenaActual.estado : 'Pendiente';
+
+                const nuevaResenaObj = {
+                    nombre: user.displayName.split(' ')[0],
+                    puntaje: Number(miPuntaje),
+                    comentario: miComentario,
+                    estado: miEstadoActual
+                };
 
                 await planRef.set({
                     resenas: {
-                        [user.uid]: {
-                            nombre: user.displayName.split(' ')[0],
-                            puntaje: Number(miPuntaje),
-                            comentario: miComentario,
-                            estado: miEstadoActual
-                        }
+                        [user.uid]: nuevaResenaObj
                     }
                 }, { merge: true });
 
@@ -311,15 +347,10 @@
                     ...prev,
                     resenas: {
                         ...prev.resenas,
-                        [user.uid]: {
-                            nombre: user.displayName.split(' ')[0],
-                            puntaje: Number(miPuntaje),
-                            comentario: miComentario,
-                            estado: miEstadoActual
-                        }
+                        [user.uid]: nuevaResenaObj
                     }
                 }));
-                alert("¡Tu valoración se guardó con éxito! ✨");
+                alert("¡Tu valoración y reseña se guardaron con éxito! ✨");
             };
 
             // PANTALLA DE CARGA
@@ -357,21 +388,22 @@
                 </div>
             );
 
-            // VISTA DETALLE DEL PLAN
-            if (planSeleccionado) {
+            // VISTA DETALLE DEL PLAN Y RESEÑA
+            if (planSeleccionado && categoria) {
                 const resenas = planSeleccionado.resenas ? Object.values(planSeleccionado.resenas) : [];
                 const miResenaActual = planSeleccionado.resenas && planSeleccionado.resenas[user.uid];
                 const miEstado = miResenaActual ? miResenaActual.estado : 'Pendiente';
 
-                const ratingPareja = resenas.filter(r => r.puntaje).length > 0
-                    ? (resenas.reduce((acc, r) => acc + (r.puntaje || 0), 0) / resenas.filter(r => r.puntaje).length).toFixed(1)
+                const resenasConPuntaje = resenas.filter(r => r.puntaje && r.puntaje > 0);
+                const ratingPareja = resenasConPuntaje.length > 0
+                    ? (resenasConPuntaje.reduce((acc, r) => acc + r.puntaje, 0) / resenasConPuntaje.length).toFixed(1)
                     : null;
 
                 return (
                     <div className="min-h-screen p-5 max-w-md mx-auto">
                         <div className="flex items-center justify-between mb-4">
                             <button onClick={() => setPlanSeleccionado(null)} className="text-xs font-bold text-[#8C7A78] bg-white px-4 py-2 rounded-full soft-card">
-                                ⬅ Volver
+                                ⬅ Volver a {categoria.titulo}
                             </button>
                             <div className="flex gap-2">
                                 <button onClick={(e) => abrirEdicion(planSeleccionado, e)} className="text-xs bg-white p-2 rounded-full soft-card">✏️</button>
@@ -383,12 +415,12 @@
                             <span className="text-4xl block mb-2">{categoria.icono}</span>
                             <h2 className="text-2xl font-bold text-[#4A3E3D]">{planSeleccionado.titulo}</h2>
 
-                            {/* Detalles según categoría */}
+                            {/* Detalles de la categoría */}
                             <div className="mt-4 text-xs text-[#8C7A78] space-y-1.5 text-left bg-[#FDFBF7] p-4 rounded-2xl border border-[#F0E6DF]">
                                 {categoria.id === 'pelis' && (
                                     <>
                                         <p>📺 <b>Plataforma:</b> {planSeleccionado.plataforma || 'No especificada'}</p>
-                                        <p>👁️ <b>¿Quién la vio?:</b> {planSeleccionado.quienLaVio}</p>
+                                        <p>👁️ <b>¿Quién la vio?:</b> {planSeleccionado.quienLaVio || 'Nadie'}</p>
                                     </>
                                 )}
                                 {categoria.id === 'lugares' && (
@@ -396,7 +428,7 @@
                                         <p>📍 <b>Ubicación:</b> {planSeleccionado.ubicacion || 'No especificada'}</p>
                                         <p>🕒 <b>Días/Horarios:</b> {planSeleccionado.diasHorarios || 'No especificados'}</p>
                                         {planSeleccionado.agendarFecha && <p>📅 <b>Fecha agendada:</b> {planSeleccionado.agendarFecha}</p>}
-                                        <p>🙋‍♂️ <b>¿Alguno fue previamente?:</b> {planSeleccionado.fuePreviamente}</p>
+                                        <p>🙋‍♂️ <b>¿Alguno fue previamente?:</b> {planSeleccionado.fuePreviamente || 'Nadie'}</p>
                                     </>
                                 )}
                                 {categoria.id === 'espectaculos' && (
@@ -419,7 +451,7 @@
                                         <p>🛒 <b>Ingredientes:</b> {planSeleccionado.ingredientes || 'No especificados'}</p>
                                         <p>👨‍🍳 <b>Pasos:</b> {planSeleccionado.pasos || 'No especificados'}</p>
                                         {planSeleccionado.linkReceta && (
-                                            <p>🔗 <b>Link:</b> <a href={planSeleccionado.linkReceta} target="_blank" rel="noreferrer" className="text-[#D88A8A] underline">Ver receta completa</a></p>
+                                            <p>🔗 <b>Link:</b> <a href={planSeleccionado.linkReceta} target="_blank" rel="noreferrer" className="text-[#D88A8A] underline font-bold">Ver receta online</a></p>
                                         )}
                                     </>
                                 )}
@@ -434,49 +466,60 @@
                             </div>
 
                             {ratingPareja && (
-                                <div className="mt-4 bg-[#FFF0F2] inline-block px-4 py-2 rounded-full text-[#D88A8A] font-bold text-xs">
-                                    💕 Rating de la pareja: {ratingPareja} / 5 ⭐
+                                <div className="mt-4 bg-[#FFF0F2] inline-block px-4 py-2 rounded-full text-[#D88A8A] font-bold text-xs shadow-sm">
+                                    💕 Puntuación de la Pareja: {ratingPareja} / 5 ⭐
                                 </div>
                             )}
                         </div>
 
-                        {/* RESEÑAS Y ESTRELLAS */}
+                        {/* RESEÑAS PUBLICADAS */}
                         <div className="space-y-3 mb-6">
-                            <h3 className="font-bold text-base text-[#4A3E3D] ml-2">Nuestras Opiniones ✨</h3>
-                            {resenas.length === 0 && (
+                            <h3 className="font-bold text-base text-[#4A3E3D] ml-2">Nuestras Reseñas y Valoraciones ✨</h3>
+                            {resenas.length === 0 ? (
                                 <p className="text-xs text-[#8C7A78] ml-2 italic">Aún no hay opiniones guardadas.</p>
-                            )}
-                            {resenas.map((r, idx) => (
-                                <div key={idx} className="soft-card p-4 rounded-3xl">
-                                    <div className="flex justify-between items-center mb-1">
-                                        <span className="font-bold text-[#4A3E3D] text-sm">{r.nombre}</span>
-                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${r.estado === 'Hecho' ? 'bg-[#E2F0D9] text-[#416132]' : 'bg-[#F2E8E1] text-[#8C7A78]'}`}>
-                                            {r.estado}
-                                        </span>
+                            ) : (
+                                resenas.map((r, idx) => (
+                                    <div key={idx} className="soft-card p-4 rounded-3xl">
+                                        <div className="flex justify-between items-center mb-1">
+                                            <span className="font-bold text-[#4A3E3D] text-sm">{r.nombre}</span>
+                                            <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${r.estado === 'Hecho' ? 'bg-[#E2F0D9] text-[#416132]' : 'bg-[#F2E8E1] text-[#8C7A78]'}`}>
+                                                {r.estado}
+                                            </span>
+                                        </div>
+                                        {r.puntaje && (
+                                            <div className="text-[#FBBF24] text-xs mb-1">
+                                                {"★".repeat(r.puntaje)}{"☆".repeat(5 - r.puntaje)} ({r.puntaje}/5)
+                                            </div>
+                                        )}
+                                        {r.comentario ? (
+                                            <p className="text-xs text-[#6E5A58] italic bg-[#FDFBF7] p-3 rounded-2xl border border-[#F0E6DF] mt-1">"{r.comentario}"</p>
+                                        ) : (
+                                            <p className="text-[10px] text-[#A3928E] italic">Sin reseña escrita.</p>
+                                        )}
                                     </div>
-                                    {r.puntaje && <div className="text-[#FBBF24] text-xs mb-1">{"★".repeat(r.puntaje)}{"☆".repeat(5 - r.puntaje)}</div>}
-                                    {r.comentario && <p className="text-xs text-[#6E5A58] italic">"{r.comentario}"</p>}
-                                </div>
-                            ))}
+                                ))
+                            )}
                         </div>
 
-                        {/* VALORAR CON ESTRELLAS */}
+                        {/* FORMULARIO VALORAR Y RESEÑAR */}
                         <div className="soft-card p-6 rounded-[2.5rem]">
-                            <h3 className="font-bold text-sm text-[#4A3E3D] mb-2 text-center">Dejar mi valoración</h3>
+                            <h3 className="font-bold text-sm text-[#4A3E3D] mb-1 text-center">Valorar y Dejar Reseña</h3>
+                            <p className="text-[10px] text-[#8C7A78] text-center mb-3">Elegí de 1 a 5 estrellas y dejá tu comentario</p>
+
                             <form onSubmit={guardarResena} className="space-y-3">
                                 <StarRating rating={miPuntaje} setRating={setMiPuntaje} />
                                 <div>
-                                    <label className="text-[10px] font-bold text-[#8C7A78] ml-2">Tu Comentario / Reseña</label>
+                                    <label className="text-[10px] font-bold text-[#8C7A78] ml-2">Tu Reseña / Comentario</label>
                                     <textarea 
-                                        placeholder="¿Qué te pareció o qué expectativas tenés?" 
+                                        placeholder="¿Qué te pareció o qué expectativas tenés de este plan?" 
                                         value={miComentario} 
                                         onChange={e => setMiComentario(e.target.value)} 
-                                        className="w-full bg-[#FDFBF7] p-3 rounded-2xl text-xs outline-none text-[#4A3E3D] border border-[#F0E6DF] resize-none" 
+                                        className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl text-xs outline-none text-[#4A3E3D] border border-[#F0E6DF] resize-none mt-1" 
                                         rows="3" 
                                     ></textarea>
                                 </div>
-                                <button type="submit" className="w-full bg-[#B39283] text-white py-3 rounded-2xl text-xs font-bold active:scale-95 transition-all">
-                                    Guardar Valoración
+                                <button type="submit" className="w-full bg-[#B39283] text-white py-3.5 rounded-2xl text-xs font-bold active:scale-95 transition-all shadow-sm">
+                                    Guardar mi Valoración y Reseña
                                 </button>
                             </form>
                         </div>
@@ -484,7 +527,7 @@
                 );
             }
 
-            // VISTA CATEGORÍA SELECCIONADA
+            // VISTA LISTA DE PLANES POR CATEGORÍA
             if (categoria) {
                 const planesFiltrados = planes.filter(p => {
                     const miEstado = p.resenas && p.resenas[user.uid] ? p.resenas[user.uid].estado : 'Pendiente';
@@ -496,7 +539,7 @@
                 return (
                     <div className="min-h-screen p-5 max-w-md mx-auto">
                         <header className="flex items-center justify-between mb-5">
-                            <button onClick={() => { setCategoria(null); setMostrarForm(false); resetForm(); }} className="text-xs font-bold text-[#8C7A78] bg-white px-4 py-2 rounded-full soft-card">
+                            <button onClick={() => { setCategoria(null); setPlanSeleccionado(null); }} className="text-xs font-bold text-[#8C7A78] bg-white px-4 py-2 rounded-full soft-card">
                                 ⬅ Categorías
                             </button>
                             <div className={`px-4 py-2 rounded-full ${categoria.color} ${categoria.text} ${categoria.border} border font-bold text-xs flex items-center gap-2 shadow-sm`}>
@@ -505,7 +548,7 @@
                             </div>
                         </header>
 
-                        {/* Filtros */}
+                        {/* Filtros de la categoría */}
                         <div className="flex bg-[#F2E8E1] p-1 rounded-full mb-5 text-xs font-bold text-[#8C7A78]">
                             <button 
                                 onClick={() => setFiltroEstado('todos')} 
@@ -532,7 +575,7 @@
                                 <div className="space-y-3 mb-6">
                                     {planesFiltrados.length === 0 ? (
                                         <div className="text-center p-8 soft-card rounded-3xl text-[#8C7A78] text-xs">
-                                            No hay planes en esta lista todavía. ¡Agregá uno nuevo! ✨
+                                            No hay planes guardados en esta categoría todavía. ¡Agregá uno nuevo! ✨
                                         </div>
                                     ) : (
                                         planesFiltrados.map(plan => {
@@ -551,11 +594,11 @@
                                                             </span>
                                                         </div>
                                                         <p className="text-xs text-[#8C7A78] line-clamp-1">
-                                                            {categoria.id === 'pelis' && (plan.plataforma || 'Ver detalle')}
-                                                            {categoria.id === 'lugares' && (plan.ubicacion || 'Ver detalle')}
-                                                            {categoria.id === 'espectaculos' && (plan.ubicacion || 'Ver detalle')}
-                                                            {categoria.id === 'comer' && (plan.especialidad || plan.ubicacion || 'Ver detalle')}
-                                                            {categoria.id === 'cocinar' && (plan.ingredientes || 'Ver ingredientes')}
+                                                            {categoria.id === 'pelis' && (plan.plataforma || 'Ver detalles')}
+                                                            {categoria.id === 'lugares' && (plan.ubicacion || 'Ver detalles')}
+                                                            {categoria.id === 'espectaculos' && (plan.ubicacion || 'Ver detalles')}
+                                                            {categoria.id === 'comer' && (plan.especialidad || plan.ubicacion || 'Ver detalles')}
+                                                            {categoria.id === 'cocinar' && (plan.ingredientes || 'Ver receta')}
                                                         </p>
                                                     </div>
 
@@ -581,7 +624,7 @@
                                 </button>
                             </>
                         ) : (
-                            /* Formulario Dinámico según Categoría */
+                            /* Formulario para Crear / Editar Plan */
                             <div className="soft-card p-6 rounded-[2.5rem]">
                                 <h3 className="font-bold text-[#4A3E3D] text-base mb-4 text-center">
                                     {planEditando ? "Editar Plan ✏️" : `Nuevo Plan en ${categoria.titulo} 💖`}
@@ -592,14 +635,14 @@
                                         <input 
                                             type="text" 
                                             required 
-                                            placeholder="ej. Batman, Guerrin, Pasteles de crema..." 
+                                            placeholder="ej. Batman, Guerrin, Torta de frutilla..." 
                                             value={formCampos.titulo} 
                                             onChange={e => setFormCampos({...formCampos, titulo: e.target.value})} 
                                             className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl font-bold outline-none text-[#4A3E3D] mt-1 border border-[#F0E6DF]" 
                                         />
                                     </div>
 
-                                    {/* Campos para Pelis & Series */}
+                                    {/* Pelis & Series */}
                                     {categoria.id === 'pelis' && (
                                         <>
                                             <div>
@@ -618,7 +661,7 @@
                                         </>
                                     )}
 
-                                    {/* Campos para Lugares por Visitar */}
+                                    {/* Lugares por Visitar */}
                                     {categoria.id === 'lugares' && (
                                         <>
                                             <div>
@@ -645,12 +688,12 @@
                                         </>
                                     )}
 
-                                    {/* Campos para Espectáculos */}
+                                    {/* Espectáculos */}
                                     {categoria.id === 'espectaculos' && (
                                         <>
                                             <div>
                                                 <label className="font-bold text-[#8C7A78] ml-2">Ubicación / Estadio / Teatro</label>
-                                                <input type="text" placeholder="ej. Movistar Arena, Teatro Gran Rex" value={formCampos.ubicacion} onChange={e => setFormCampos({...formCampos, ubicacion: e.target.value})} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl outline-none text-[#4A3E3D] mt-1 border border-[#F0E6DF]" />
+                                                <input type="text" placeholder="ej. Movistar Arena, Gran Rex" value={formCampos.ubicacion} onChange={e => setFormCampos({...formCampos, ubicacion: e.target.value})} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl outline-none text-[#4A3E3D] mt-1 border border-[#F0E6DF]" />
                                             </div>
                                             <div>
                                                 <label className="font-bold text-[#8C7A78] ml-2">Días y Horarios</label>
@@ -663,16 +706,16 @@
                                         </>
                                     )}
 
-                                    {/* Campos para Salir a Comer */}
+                                    {/* Salir a Comer */}
                                     {categoria.id === 'comer' && (
                                         <>
                                             <div>
                                                 <label className="font-bold text-[#8C7A78] ml-2">Ubicación / Barrio</label>
-                                                <input type="text" placeholder="ej. Av. Corrientes, Palermo Hollywood" value={formCampos.ubicacion} onChange={e => setFormCampos({...formCampos, ubicacion: e.target.value})} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl outline-none text-[#4A3E3D] mt-1 border border-[#F0E6DF]" />
+                                                <input type="text" placeholder="ej. Av. Corrientes, Palermo" value={formCampos.ubicacion} onChange={e => setFormCampos({...formCampos, ubicacion: e.target.value})} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl outline-none text-[#4A3E3D] mt-1 border border-[#F0E6DF]" />
                                             </div>
                                             <div>
                                                 <label className="font-bold text-[#8C7A78] ml-2">Especialidad recomendada</label>
-                                                <input type="text" placeholder="ej. Pizza de muzzarella, Pastas rellenas" value={formCampos.especialidad} onChange={e => setFormCampos({...formCampos, especialidad: e.target.value})} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl outline-none text-[#4A3E3D] mt-1 border border-[#F0E6DF]" />
+                                                <input type="text" placeholder="ej. Pizza de muzzarella, Pasta" value={formCampos.especialidad} onChange={e => setFormCampos({...formCampos, especialidad: e.target.value})} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl outline-none text-[#4A3E3D] mt-1 border border-[#F0E6DF]" />
                                             </div>
                                             <div>
                                                 <label className="font-bold text-[#8C7A78] ml-2">Días y Horarios</label>
@@ -685,19 +728,19 @@
                                         </>
                                     )}
 
-                                    {/* Campos para Para Cocinar */}
+                                    {/* Para Cocinar */}
                                     {categoria.id === 'cocinar' && (
                                         <>
                                             <div>
                                                 <label className="font-bold text-[#8C7A78] ml-2">Ingredientes principales</label>
-                                                <textarea placeholder="ej. Harina, huevos, crema de leche, chocolate..." value={formCampos.ingredientes} onChange={e => setFormCampos({...formCampos, ingredientes: e.target.value})} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl outline-none text-[#4A3E3D] mt-1 border border-[#F0E6DF] resize-none" rows="2"></textarea>
+                                                <textarea placeholder="ej. Harina, huevos, crema de leche..." value={formCampos.ingredientes} onChange={e => setFormCampos({...formCampos, ingredientes: e.target.value})} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl outline-none text-[#4A3E3D] mt-1 border border-[#F0E6DF] resize-none" rows="2"></textarea>
                                             </div>
                                             <div>
                                                 <label className="font-bold text-[#8C7A78] ml-2">Pasos de la receta</label>
-                                                <textarea placeholder="ej. 1. Mezclar todo. 2. Hornear 20 min..." value={formCampos.pasos} onChange={e => setFormCampos({...formCampos, pasos: e.target.value})} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl outline-none text-[#4A3E3D] mt-1 border border-[#F0E6DF] resize-none" rows="2"></textarea>
+                                                <textarea placeholder="ej. 1. Mezclar todo. 2. Hornear..." value={formCampos.pasos} onChange={e => setFormCampos({...formCampos, pasos: e.target.value})} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl outline-none text-[#4A3E3D] mt-1 border border-[#F0E6DF] resize-none" rows="2"></textarea>
                                             </div>
                                             <div>
-                                                <label className="font-bold text-[#8C7A78] ml-2">Link de la receta online (Opcional)</label>
+                                                <label className="font-bold text-[#8C7A78] ml-2">Link de receta online (Opcional)</label>
                                                 <input type="url" placeholder="https://..." value={formCampos.linkReceta} onChange={e => setFormCampos({...formCampos, linkReceta: e.target.value})} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl outline-none text-[#4A3E3D] mt-1 border border-[#F0E6DF]" />
                                             </div>
                                         </>
@@ -741,7 +784,7 @@
                         {CATEGORIAS.map(cat => (
                             <div 
                                 key={cat.id} 
-                                onClick={() => { setCategoria(cat); setFiltroEstado('todos'); }} 
+                                onClick={() => seleccionarCategoria(cat)} 
                                 className={`${cat.color} ${cat.border} border p-5 rounded-[2rem] cursor-pointer soft-card hover:shadow-md transition-all active:scale-98 flex items-center justify-between`}
                             >
                                 <div className="flex items-center gap-4">
