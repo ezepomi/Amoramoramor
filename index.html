@@ -41,7 +41,12 @@
         .animate-heart-1 { animation: heartPulse 1.4s infinite ease-in-out; }
         .animate-heart-2 { animation: heartPulse 1.4s infinite ease-in-out 0.2s; }
         .animate-heart-3 { animation: heartPulse 1.4s infinite ease-in-out 0.4s; }
-        .soft-shadow { box-shadow: 0 4px 20px -2px rgba(0,0,0,0.05); }
+        .soft-card {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(8px);
+            border: 1px solid #F0E6DF;
+            box-shadow: 0 8px 24px -4px rgba(74, 62, 61, 0.04);
+        }
     </style>
 </head>
 <body>
@@ -51,15 +56,14 @@
         const { useState, useEffect } = React;
 
         const firebaseConfig = {
-  apiKey: "AIzaSyASEQnD0tZYJu-VZMzTITQp8JbPg-L1JX0",
-  authDomain: "amor-64f24.firebaseapp.com",
-  projectId: "amor-64f24",
-  storageBucket: "amor-64f24.firebasestorage.app",
-  messagingSenderId: "839882538903",
-  appId: "1:839882538903:web:89759b5effe6b782f24ed2",
-  measurementId: "G-CZY3VXDK08"
-};
-        
+            apiKey: "AIzaSyASEQnD0tZYJu-VZMzTITQp8JbPg-L1JX0",
+            authDomain: "amor-64f24.firebaseapp.com",
+            projectId: "amor-64f24",
+            storageBucket: "amor-64f24.firebasestorage.app",
+            messagingSenderId: "839882538903",
+            appId: "1:839882538903:web:89759b5effe6b782f24ed2",
+            measurementId: "G-CZY3VXDK08"
+        };
 
         if (!firebase.apps.length) {
             firebase.initializeApp(firebaseConfig);
@@ -75,12 +79,37 @@
         ];
 
         const CATEGORIAS = [
-            { id: 'pelis', titulo: 'Pelis & Series', icono: '🎬', color: 'bg-[#EAE4F2]', text: 'text-[#5B4870]' },
-            { id: 'lugares', titulo: 'Lugares por Visitar', icono: '📍', color: 'bg-[#FBE8DB]', text: 'text-[#825435]' },
-            { id: 'espectaculos', titulo: 'Espectáculos', icono: '🎟️', color: 'bg-[#E2F0D9]', text: 'text-[#416132]' },
-            { id: 'comer', titulo: 'Salir a Comer', icono: '🍽️', color: 'bg-[#FCF4DD]', text: 'text-[#7A6221]' },
-            { id: 'cocinar', titulo: 'Para Cocinar', icono: '👨‍🍳', color: 'bg-[#FCE2E6]', text: 'text-[#823A46]' }
+            { id: 'pelis', titulo: 'Pelis & Series', icono: '🎬', color: 'bg-[#EAE4F2]', text: 'text-[#5B4870]', border: 'border-[#D8CCE6]' },
+            { id: 'lugares', titulo: 'Lugares por Visitar', icono: '📍', color: 'bg-[#FBE8DB]', text: 'text-[#825435]', border: 'border-[#F5D5C0]' },
+            { id: 'espectaculos', titulo: 'Espectáculos', icono: '🎟️', color: 'bg-[#E2F0D9]', text: 'text-[#416132]', border: 'border-[#CCE3BF]' },
+            { id: 'comer', titulo: 'Salir a Comer', icono: '🍽️', color: 'bg-[#FCF4DD]', text: 'text-[#7A6221]', border: 'border-[#F7E7B8]' },
+            { id: 'cocinar', titulo: 'Para Cocinar', icono: '👨‍🍳', color: 'bg-[#FCE2E6]', text: 'text-[#823A46]', border: 'border-[#F7C6CE]' }
         ];
+
+        // Función para calcular los días desde que se creó el plan
+        const calcularDias = (timestamp) => {
+            if (!timestamp) return "Reciente";
+            const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+            const now = new Date();
+            const diffTime = Math.abs(now - date);
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+            if (diffDays === 0) return "Hoy ✨";
+            if (diffDays === 1) return "Hace 1 día 🌸";
+            return `Hace ${diffDays} días 📅`;
+        };
+
+        // Componente Switch Toggle (✅ / ⏳)
+        const SwitchToggle = ({ checked, onChange }) => (
+            <button 
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onChange(); }}
+                className={`w-14 h-8 flex items-center rounded-full p-1 transition-colors duration-300 ${checked ? 'bg-[#A8D5BA]' : 'bg-[#E5DCD6]'}`}
+            >
+                <div className={`bg-white w-6 h-6 rounded-full shadow-md transform transition-transform duration-300 flex items-center justify-center text-xs ${checked ? 'translate-x-6' : 'translate-x-0'}`}>
+                    {checked ? '✅' : '⏳'}
+                </div>
+            </button>
+        );
 
         const App = () => {
             const [user, setUser] = useState(null);
@@ -89,20 +118,24 @@
             const [categoria, setCategoria] = useState(null);
             const [planes, setPlanes] = useState([]);
             const [planSeleccionado, setPlanSeleccionado] = useState(null);
+            const [filtroEstado, setFiltroEstado] = useState('todos'); // 'todos', 'pendiente', 'hecho'
             
+            // Formularios
             const [mostrarForm, setMostrarForm] = useState(false);
+            const [planEditando, setPlanEditando] = useState(null);
             const [nuevoPlan, setNuevoPlan] = useState({ titulo: '', detalle: '' });
-            const [miResena, setMiResena] = useState({ puntaje: 5, comentario: '', estado: 'Hecho' });
+            const [miResena, setMiResena] = useState({ puntaje: 5, comentario: '' });
 
             useEffect(() => {
                 setFraseActual(FRASES_CARGA[Math.floor(Math.random() * FRASES_CARGA.length)]);
                 const unsubscribe = auth.onAuthStateChanged((u) => {
                     setUser(u);
-                    setTimeout(() => setLoading(false), 2500);
+                    setTimeout(() => setLoading(false), 2000);
                 });
                 return () => unsubscribe();
             }, []);
 
+            // Escuchar planes de la categoría seleccionada
             useEffect(() => {
                 if (!user || !categoria) return;
                 const unsub = db.collection('planes')
@@ -118,220 +151,422 @@
             const login = () => auth.signInWithPopup(googleProvider).catch(err => alert(err.message));
             const logout = () => auth.signOut();
 
+            // Agregar o Editar Plan
             const guardarPlan = async (e) => {
                 e.preventDefault();
                 if (!nuevoPlan.titulo) return;
-                await db.collection('planes').add({
-                    categoria: categoria.id,
-                    titulo: nuevoPlan.titulo,
-                    detalle: nuevoPlan.detalle,
-                    fechaCreacion: firebase.firestore.FieldValue.serverTimestamp(),
-                    creadoPor: user.displayName,
-                    resenas: {}
-                });
+
+                if (planEditando) {
+                    await db.collection('planes').doc(planEditando.id).update({
+                        titulo: nuevoPlan.titulo,
+                        detalle: nuevoPlan.detalle
+                    });
+                    setPlanEditando(null);
+                } else {
+                    await db.collection('planes').add({
+                        categoria: categoria.id,
+                        titulo: nuevoPlan.titulo,
+                        detalle: nuevoPlan.detalle,
+                        fechaCreacion: firebase.firestore.FieldValue.serverTimestamp(),
+                        creadoPor: user.displayName,
+                        resenas: {}
+                    });
+                }
                 setNuevoPlan({ titulo: '', detalle: '' });
                 setMostrarForm(false);
             };
 
-            const guardarResena = async (e) => {
-                e.preventDefault();
-                const planRef = db.collection('planes').doc(planSeleccionado.id);
+            const abrirEdicion = (plan, e) => {
+                e.stopPropagation();
+                setPlanEditando(plan);
+                setNuevoPlan({ titulo: plan.titulo, detalle: plan.detalle || '' });
+                setMostrarForm(true);
+            };
+
+            const eliminarPlan = async (planId, e) => {
+                e.stopPropagation();
+                if (confirm("¿Querés eliminar este plan? 🗑️")) {
+                    await db.collection('planes').doc(planId).delete();
+                    if (planSeleccionado && planSeleccionado.id === planId) {
+                        setPlanSeleccionado(null);
+                    }
+                }
+            };
+
+            // Cambiar estado vía Switch (Hecho / Pendiente)
+            const toggleEstadoPlan = async (plan) => {
+                const planRef = db.collection('planes').doc(plan.id);
+                const miResenaActual = plan.resenas && plan.resenas[user.uid];
+                const estadoActual = miResenaActual ? miResenaActual.estado : 'Pendiente';
+                const nuevoEstado = estadoActual === 'Hecho' ? 'Pendiente' : 'Hecho';
+
                 await planRef.set({
                     resenas: {
                         [user.uid]: {
                             nombre: user.displayName.split(' ')[0],
-                            puntaje: miResena.puntaje,
-                            comentario: miResena.comentario,
-                            estado: miResena.estado
+                            puntaje: miResenaActual ? miResenaActual.puntaje : 5,
+                            comentario: miResenaActual ? miResenaActual.comentario : '',
+                            estado: nuevoEstado
                         }
                     }
                 }, { merge: true });
-                
-                const updatedPlan = {
-                    ...planSeleccionado,
+
+                if (planSeleccionado && planSeleccionado.id === plan.id) {
+                    setPlanSeleccionado(prev => ({
+                        ...prev,
+                        resenas: {
+                            ...prev.resenas,
+                            [user.uid]: {
+                                nombre: user.displayName.split(' ')[0],
+                                puntaje: miResenaActual ? miResenaActual.puntaje : 5,
+                                comentario: miResenaActual ? miResenaActual.comentario : '',
+                                estado: nuevoEstado
+                            }
+                        }
+                    }));
+                }
+            };
+
+            // Guardar Reseña y Puntuación
+            const guardarResena = async (e) => {
+                e.preventDefault();
+                const planRef = db.collection('planes').doc(planSeleccionado.id);
+                const miResenaActual = planSeleccionado.resenas && planSeleccionado.resenas[user.uid];
+                const miEstadoActual = miResenaActual ? miResenaActual.estado : 'Hecho';
+
+                await planRef.set({
                     resenas: {
-                        ...planSeleccionado.resenas,
-                        [user.uid]: { nombre: user.displayName.split(' ')[0], puntaje: miResena.puntaje, comentario: miResena.comentario, estado: miResena.estado }
+                        [user.uid]: {
+                            nombre: user.displayName.split(' ')[0],
+                            puntaje: Number(miResena.puntaje),
+                            comentario: miResena.comentario,
+                            estado: miEstadoActual
+                        }
                     }
-                };
-                setPlanSeleccionado(updatedPlan);
+                }, { merge: true });
+
+                setPlanSeleccionado(prev => ({
+                    ...prev,
+                    resenas: {
+                        ...prev.resenas,
+                        [user.uid]: {
+                            nombre: user.displayName.split(' ')[0],
+                            puntaje: Number(miResena.puntaje),
+                            comentario: miResena.comentario,
+                            estado: miEstadoActual
+                        }
+                    }
+                }));
                 alert("¡Tu valoración se guardó con éxito! ✨");
             };
 
-            // PANTALLA DE CARGA
+            // 1. PANTALLA DE CARGA
             if (loading) return (
-                <div className="min-h-screen flex flex-col justify-between items-center p-8 text-center select-none">
-                    <div className="pt-12"><span className="text-sm font-semibold text-[#B39283] tracking-widest uppercase">Nuestros Planes</span></div>
+                <div className="min-h-screen flex flex-col justify-between items-center p-8 text-center select-none bg-[#FDFBF7]">
+                    <div className="pt-12">
+                        <span className="text-xs font-bold text-[#B39283] tracking-widest uppercase">Nuestros Planes</span>
+                    </div>
                     <div className="flex flex-col items-center gap-6">
                         <div className="flex items-center justify-center gap-3">
                             <span className="text-3xl animate-heart-1">🌸</span>
                             <span className="text-5xl animate-heart-2">💖</span>
                             <span className="text-3xl animate-heart-3">✨</span>
                         </div>
-                        <p className="text-lg font-medium text-[#6E5A58] max-w-xs leading-relaxed italic">"{fraseActual}"</p>
+                        <p className="text-base font-medium text-[#6E5A58] max-w-xs leading-relaxed italic">"{fraseActual}"</p>
                     </div>
-                    <div className="pb-6"><span className="font-cursive text-5xl text-[#D88A8A] font-bold tracking-wider">J&E</span></div>
+                    <div className="pb-6">
+                        <span className="font-cursive text-5xl text-[#D88A8A] font-bold tracking-wider">J&E</span>
+                    </div>
                 </div>
             );
 
-            // LOGIN
+            // 2. LOGIN
             if (!user) return (
-                <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center">
-                    <div className="w-full max-w-sm bg-white p-8 rounded-[2.5rem] soft-shadow space-y-6">
+                <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center bg-[#FDFBF7]">
+                    <div className="w-full max-w-sm soft-card p-8 rounded-[2.5rem] space-y-6">
                         <div className="text-5xl">✨❤️</div>
-                        <h1 className="text-2xl font-bold">Nuestros planes</h1>
-                        <p className="text-sm text-[#8C7A78]">Iniciá sesión para guardar y organizar nuestras citas juntos.</p>
-                        <button onClick={login} className="w-full bg-[#E8A598] text-white py-4 rounded-full font-semibold shadow-md active:scale-95 transition-all">Ingresar con Google</button>
+                        <h1 className="text-2xl font-bold text-[#4A3E3D]">Nuestros planes</h1>
+                        <p className="text-xs text-[#8C7A78] leading-relaxed">Un espacio privado para organizar nuestras citas, pelis, lugares y momentos juntos.</p>
+                        <button onClick={login} className="w-full bg-[#E8A598] hover:bg-[#DF9789] text-white py-4 rounded-full font-semibold shadow-sm active:scale-95 transition-all">
+                            Ingresar con Google
+                        </button>
                     </div>
                     <span className="font-cursive text-4xl text-[#D88A8A] font-bold mt-8">J&E</span>
                 </div>
             );
 
-            // DETALLE DEL PLAN Y RESEÑAS CRUZADAS
+            // 3. DETALLE DEL PLAN Y RESEÑAS
             if (planSeleccionado) {
                 const resenas = planSeleccionado.resenas ? Object.values(planSeleccionado.resenas) : [];
-                const ratingPareja = resenas.length > 0 
-                    ? (resenas.reduce((acc, r) => acc + r.puntaje, 0) / resenas.length).toFixed(1) 
+                const miResenaActual = planSeleccionado.resenas && planSeleccionado.resenas[user.uid];
+                const miEstado = miResenaActual ? miResenaActual.estado : 'Pendiente';
+
+                const ratingPareja = resenas.filter(r => r.puntaje).length > 0
+                    ? (resenas.reduce((acc, r) => acc + (r.puntaje || 0), 0) / resenas.filter(r => r.puntaje).length).toFixed(1)
                     : null;
 
                 return (
                     <div className="min-h-screen p-5 max-w-md mx-auto">
-                        <button onClick={() => setPlanSeleccionado(null)} className="text-sm font-bold text-[#8C7A78] bg-white px-4 py-2 rounded-full mb-4 soft-shadow">⬅ Volver</button>
+                        <div className="flex items-center justify-between mb-4">
+                            <button onClick={() => setPlanSeleccionado(null)} className="text-xs font-bold text-[#8C7A78] bg-white px-4 py-2 rounded-full soft-card">
+                                ⬅ Volver
+                            </button>
+                            <div className="flex gap-2">
+                                <button onClick={(e) => abrirEdicion(planSeleccionado, e)} className="text-xs bg-white p-2 rounded-full soft-card">✏️</button>
+                                <button onClick={(e) => eliminarPlan(planSeleccionado.id, e)} className="text-xs bg-white p-2 rounded-full soft-card">🗑️</button>
+                            </div>
+                        </div>
                         
-                        <div className="bg-white p-6 rounded-[2.5rem] soft-shadow mb-6 text-center">
+                        <div className="soft-card p-6 rounded-[2.5rem] mb-6 text-center relative overflow-hidden">
                             <span className="text-4xl block mb-2">{categoria.icono}</span>
                             <h2 className="text-2xl font-bold text-[#4A3E3D]">{planSeleccionado.titulo}</h2>
-                            <p className="text-[#8C7A78] mt-1">{planSeleccionado.detalle}</p>
+                            {planSeleccionado.detalle && <p className="text-xs text-[#8C7A78] mt-2">{planSeleccionado.detalle}</p>}
                             
+                            <div className="flex items-center justify-center gap-2 mt-4 pt-4 border-t border-[#F2E8E1]">
+                                <span className="text-xs font-bold text-[#8C7A78]">Estado para mí:</span>
+                                <SwitchToggle 
+                                    checked={miEstado === 'Hecho'} 
+                                    onChange={() => toggleEstadoPlan(planSeleccionado)} 
+                                />
+                            </div>
+
                             {ratingPareja && (
-                                <div className="mt-4 bg-[#FFF0F2] inline-block px-4 py-2 rounded-full text-[#D88A8A] font-bold text-sm">
+                                <div className="mt-4 bg-[#FFF0F2] inline-block px-4 py-2 rounded-full text-[#D88A8A] font-bold text-xs">
                                     💕 Rating de la pareja: {ratingPareja} / 5
                                 </div>
                             )}
                         </div>
 
-                        <div className="space-y-4 mb-8">
-                            <h3 className="font-bold text-lg text-[#4A3E3D] ml-2">Nuestras Opiniones ✨</h3>
-                            {resenas.length === 0 && <p className="text-sm text-[#8C7A78] ml-2 italic">Aún no hay reseñas. ¡Sé el primero en opinar!</p>}
+                        {/* OPINIONES */}
+                        <div className="space-y-3 mb-6">
+                            <h3 className="font-bold text-base text-[#4A3E3D] ml-2">Nuestras Reseñas ✨</h3>
+                            {resenas.length === 0 && (
+                                <p className="text-xs text-[#8C7A78] ml-2 italic">Aún no hay opiniones guardadas.</p>
+                            )}
                             {resenas.map((r, idx) => (
-                                <div key={idx} className="bg-white p-5 rounded-3xl soft-shadow border border-[#F2E8E1]">
-                                    <div className="flex justify-between items-center mb-2">
-                                        <span className="font-bold text-[#4A3E3D]">{r.nombre}</span>
-                                        <span className="text-[#D88A8A] text-sm font-bold">{r.estado}</span>
+                                <div key={idx} className="soft-card p-5 rounded-3xl">
+                                    <div className="flex justify-between items-center mb-1">
+                                        <span className="font-bold text-[#4A3E3D] text-sm">{r.nombre}</span>
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${r.estado === 'Hecho' ? 'bg-[#E2F0D9] text-[#416132]' : 'bg-[#F2E8E1] text-[#8C7A78]'}`}>
+                                            {r.estado}
+                                        </span>
                                     </div>
-                                    <div className="text-[#FBBF24] mb-2">{"⭐".repeat(r.puntaje)}</div>
-                                    <p className="text-sm text-[#6E5A58] italic">"{r.comentario}"</p>
+                                    {r.puntaje && <div className="text-[#FBBF24] text-xs mb-1">{"⭐".repeat(r.puntaje)}</div>}
+                                    {r.comentario && <p className="text-xs text-[#6E5A58] italic">"{r.comentario}"</p>}
                                 </div>
                             ))}
                         </div>
 
-                        <div className="bg-white p-6 rounded-[2.5rem] soft-shadow border-2 border-[#F7EFEA]">
-                            <h3 className="font-bold text-[#4A3E3D] mb-4">Dejar mi valoración</h3>
-                            <form onSubmit={guardarResena} className="space-y-4">
-                                <select value={miResena.estado} onChange={e=>setMiResena({...miResena, estado: e.target.value})} className="w-full bg-[#FDFBF7] border-none p-4 rounded-2xl text-sm font-bold outline-none text-[#4A3E3D]">
-                                    <option value="Pendiente">⏳ Pendiente (Aún no fui/lo vi)</option>
-                                    <option value="Hecho">✅ Hecho</option>
-                                </select>
-                                
-                                {miResena.estado === 'Hecho' && (
-                                    <>
-                                        <div>
-                                            <label className="text-xs font-bold text-[#8C7A78] ml-2">Mi Puntaje (1 a 5)</label>
-                                            <input type="number" min="1" max="5" value={miResena.puntaje} onChange={e=>setMiResena({...miResena, puntaje: Number(e.target.value)})} className="w-full bg-[#FDFBF7] p-4 rounded-2xl text-lg font-bold outline-none text-center text-[#4A3E3D]" />
-                                        </div>
-                                        <textarea placeholder="¿Qué te pareció?" value={miResena.comentario} onChange={e=>setMiResena({...miResena, comentario: e.target.value})} className="w-full bg-[#FDFBF7] p-4 rounded-2xl text-sm outline-none text-[#4A3E3D] resize-none" rows="3" required></textarea>
-                                    </>
-                                )}
-                                <button type="submit" className="w-full bg-[#B39283] text-white py-4 rounded-2xl font-bold shadow-md active:scale-95 transition-all">Guardar Opinión</button>
+                        {/* FORMULARIO RESEÑA */}
+                        <div className="soft-card p-6 rounded-[2.5rem]">
+                            <h3 className="font-bold text-sm text-[#4A3E3D] mb-3">Valorar este plan</h3>
+                            <form onSubmit={guardarResena} className="space-y-3">
+                                <div>
+                                    <label className="text-[10px] font-bold text-[#8C7A78] ml-2">Puntuación (1 a 5 estrellas)</label>
+                                    <input 
+                                        type="number" 
+                                        min="1" 
+                                        max="5" 
+                                        value={miResena.puntaje} 
+                                        onChange={e => setMiResena({...miResena, puntaje: e.target.value})} 
+                                        className="w-full bg-[#FDFBF7] p-3 rounded-2xl text-center font-bold text-base outline-none text-[#4A3E3D] border border-[#F0E6DF]" 
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-[#8C7A78] ml-2">Tu Comentario / Reseña</label>
+                                    <textarea 
+                                        placeholder="¿Qué te pareció o qué expectativas tenés?" 
+                                        value={miResena.comentario} 
+                                        onChange={e => setMiResena({...miResena, comentario: e.target.value})} 
+                                        className="w-full bg-[#FDFBF7] p-3 rounded-2xl text-xs outline-none text-[#4A3E3D] border border-[#F0E6DF] resize-none" 
+                                        rows="3" 
+                                    ></textarea>
+                                </div>
+                                <button type="submit" className="w-full bg-[#B39283] text-white py-3 rounded-2xl text-xs font-bold active:scale-95 transition-all">
+                                    Guardar Valoración
+                                </button>
                             </form>
                         </div>
                     </div>
                 );
             }
 
-            // LISTA DE CATEGORÍA
-            if (categoria) return (
-                <div className="min-h-screen p-5 max-w-md mx-auto">
-                    <header className="flex items-center justify-between mb-6">
-                        <button onClick={() => setCategoria(null)} className="text-sm font-bold text-[#8C7A78] bg-white px-4 py-2 rounded-full soft-shadow">⬅ Inicio</button>
-                        <div className={`px-4 py-2 rounded-full ${categoria.color} ${categoria.text} font-bold text-sm flex items-center gap-2`}>
-                            {categoria.icono} {categoria.titulo}
-                        </div>
-                    </header>
+            // 4. MENÚ DE CATEGORÍA ESPECÍFICA
+            if (categoria) {
+                // Filtrar planes
+                const planesFiltrados = planes.filter(p => {
+                    const miEstado = p.resenas && p.resenas[user.uid] ? p.resenas[user.uid].estado : 'Pendiente';
+                    if (filtroEstado === 'pendiente') return miEstado === 'Pendiente';
+                    if (filtroEstado === 'hecho') return miEstado === 'Hecho';
+                    return true;
+                });
 
-                    {!mostrarForm ? (
-                        <>
-                            <div className="space-y-3 mb-6">
-                                {planes.length === 0 ? (
-                                    <div className="text-center p-8 bg-white rounded-3xl soft-shadow text-[#8C7A78] text-sm">No hay planes acá todavía. ¡Agregá uno!</div>
-                                ) : (
-                                    planes.map(plan => {
-                                        const miEstado = plan.resenas && plan.resenas[user.uid] ? plan.resenas[user.uid].estado : 'Pendiente';
-                                        return (
-                                            <div key={plan.id} onClick={() => setPlanSeleccionado(plan)} className="bg-white p-5 rounded-3xl soft-shadow flex justify-between items-center cursor-pointer active:scale-98 transition-all">
-                                                <div>
-                                                    <h3 className="font-bold text-[#4A3E3D] text-lg">{plan.titulo}</h3>
-                                                    <p className="text-xs text-[#8C7A78] mt-1">{plan.detalle}</p>
-                                                </div>
-                                                <div className={`text-xs font-bold px-3 py-1 rounded-full ${miEstado === 'Hecho' ? 'bg-[#E2F0D9] text-[#416132]' : 'bg-[#F2E8E1] text-[#8C7A78]'}`}>
-                                                    {miEstado}
-                                                </div>
-                                            </div>
-                                        );
-                                    })
-                                )}
-                            </div>
-                            <button onClick={() => setMostrarForm(true)} className="w-full bg-[#4A3E3D] text-[#FDFBF7] py-4 rounded-full font-bold shadow-lg active:scale-95 transition-all text-lg flex items-center justify-center gap-2">
-                                <span>+</span> Agregar un Plan
+                return (
+                    <div className="min-h-screen p-5 max-w-md mx-auto">
+                        {/* Cabecera de Categoría */}
+                        <header className="flex items-center justify-between mb-5">
+                            <button onClick={() => { setCategoria(null); setMostrarForm(false); }} className="text-xs font-bold text-[#8C7A78] bg-white px-4 py-2 rounded-full soft-card">
+                                ⬅ Categorías
                             </button>
-                        </>
-                    ) : (
-                        <div className="bg-white p-6 rounded-[2.5rem] soft-shadow border-2 border-[#F7EFEA]">
-                            <h3 className="font-bold text-[#4A3E3D] text-lg mb-4 text-center">Nuevo Plan 💖</h3>
-                            <form onSubmit={guardarPlan} className="space-y-4">
-                                <div>
-                                    <label className="text-xs font-bold text-[#8C7A78] ml-2">Nombre (Peli, Lugar, Plato, etc)</label>
-                                    <input type="text" autoFocus value={nuevoPlan.titulo} onChange={e=>setNuevoPlan({...nuevoPlan, titulo: e.target.value})} className="w-full bg-[#FDFBF7] p-4 rounded-2xl text-sm font-bold outline-none text-[#4A3E3D] mt-1" required />
-                                </div>
-                                <div>
-                                    <label className="text-xs font-bold text-[#8C7A78] ml-2">Detalles (Plataforma, Ubicación, etc)</label>
-                                    <input type="text" value={nuevoPlan.detalle} onChange={e=>setNuevoPlan({...nuevoPlan, detalle: e.target.value})} className="w-full bg-[#FDFBF7] p-4 rounded-2xl text-sm outline-none text-[#4A3E3D] mt-1" />
-                                </div>
-                                <div className="flex gap-3 pt-2">
-                                    <button type="button" onClick={() => setMostrarForm(false)} className="flex-1 bg-[#F2E8E1] text-[#8C7A78] py-4 rounded-2xl font-bold">Cancelar</button>
-                                    <button type="submit" className="flex-1 bg-[#E8A598] text-white py-4 rounded-2xl font-bold shadow-md">Guardar</button>
-                                </div>
-                            </form>
-                        </div>
-                    )}
-                </div>
-            );
+                            <div className={`px-4 py-2 rounded-full ${categoria.color} ${categoria.text} ${categoria.border} border font-bold text-xs flex items-center gap-2 shadow-sm`}>
+                                <span>{categoria.icono}</span>
+                                <span>{categoria.titulo}</span>
+                            </div>
+                        </header>
 
-            // MENÚ PRINCIPAL
+                        {/* Filtros de la categoría */}
+                        <div className="flex bg-[#F2E8E1] p-1 rounded-full mb-5 text-xs font-bold text-[#8C7A78]">
+                            <button 
+                                onClick={() => setFiltroEstado('todos')} 
+                                className={`flex-1 py-2 rounded-full transition-all ${filtroEstado === 'todos' ? 'bg-white text-[#4A3E3D] shadow-sm' : ''}`}
+                            >
+                                Todos ({planes.length})
+                            </button>
+                            <button 
+                                onClick={() => setFiltroEstado('pendiente')} 
+                                className={`flex-1 py-2 rounded-full transition-all ${filtroEstado === 'pendiente' ? 'bg-white text-[#4A3E3D] shadow-sm' : ''}`}
+                            >
+                                ⏳ Pendientes
+                            </button>
+                            <button 
+                                onClick={() => setFiltroEstado('hecho')} 
+                                className={`flex-1 py-2 rounded-full transition-all ${filtroEstado === 'hecho' ? 'bg-white text-[#4A3E3D] shadow-sm' : ''}`}
+                            >
+                                ✅ Hechos
+                            </button>
+                        </div>
+
+                        {/* Lista de Elementos o Formulario */}
+                        {!mostrarForm ? (
+                            <>
+                                <div className="space-y-3 mb-6">
+                                    {planesFiltrados.length === 0 ? (
+                                        <div className="text-center p-8 soft-card rounded-3xl text-[#8C7A78] text-xs">
+                                            No hay planes en esta lista todavía. ¡Agregá uno nuevo! ✨
+                                        </div>
+                                    ) : (
+                                        planesFiltrados.map(plan => {
+                                            const miEstado = plan.resenas && plan.resenas[user.uid] ? plan.resenas[user.uid].estado : 'Pendiente';
+                                            return (
+                                                <div 
+                                                    key={plan.id} 
+                                                    onClick={() => setPlanSeleccionado(plan)} 
+                                                    className="soft-card p-4 rounded-3xl flex items-center justify-between cursor-pointer active:scale-98 transition-all"
+                                                >
+                                                    <div className="pr-2 flex-1">
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <h3 className="font-bold text-[#4A3E3D] text-base">{plan.titulo}</h3>
+                                                            <span className="text-[10px] text-[#A3928E] bg-[#F7EFEA] px-2 py-0.5 rounded-full font-medium">
+                                                                {calcularDias(plan.fechaCreacion)}
+                                                            </span>
+                                                        </div>
+                                                        {plan.detalle && <p className="text-xs text-[#8C7A78] line-clamp-1">{plan.detalle}</p>}
+                                                    </div>
+
+                                                    <div className="flex items-center gap-2">
+                                                        <SwitchToggle 
+                                                            checked={miEstado === 'Hecho'} 
+                                                            onChange={() => toggleEstadoPlan(plan)} 
+                                                        />
+                                                        <button onClick={(e) => abrirEdicion(plan, e)} className="text-xs p-1 text-[#A3928E] hover:text-[#4A3E3D]">✏️</button>
+                                                        <button onClick={(e) => eliminarPlan(plan.id, e)} className="text-xs p-1 text-[#A3928E] hover:text-red-400">🗑️</button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })
+                                    )}
+                                </div>
+
+                                <button 
+                                    onClick={() => { setPlanEditando(null); setNuevoPlan({ titulo: '', detalle: '' }); setMostrarForm(true); }} 
+                                    className="w-full bg-[#4A3E3D] text-[#FDFBF7] py-4 rounded-full font-bold shadow-md active:scale-95 transition-all text-sm flex items-center justify-center gap-2"
+                                >
+                                    <span>+</span> Agregar Plan en {categoria.titulo}
+                                </button>
+                            </>
+                        ) : (
+                            /* Formulario Agregar / Editar */
+                            <div className="soft-card p-6 rounded-[2.5rem]">
+                                <h3 className="font-bold text-[#4A3E3D] text-base mb-4 text-center">
+                                    {planEditando ? "Editar Plan ✏️" : `Nuevo Plan en ${categoria.titulo} 💖`}
+                                </h3>
+                                <form onSubmit={guardarPlan} className="space-y-4">
+                                    <div>
+                                        <label className="text-xs font-bold text-[#8C7A78] ml-2">Título del plan</label>
+                                        <input 
+                                            type="text" 
+                                            autoFocus 
+                                            placeholder="ej. Ver Interestelar, Ir a Guerrin..." 
+                                            value={nuevoPlan.titulo} 
+                                            onChange={e => setNuevoPlan({...nuevoPlan, titulo: e.target.value})} 
+                                            className="w-full bg-[#FDFBF7] p-4 rounded-2xl text-xs font-bold outline-none text-[#4A3E3D] mt-1 border border-[#F0E6DF]" 
+                                            required 
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-[#8C7A78] ml-2">Detalles adicionales (opcional)</label>
+                                        <input 
+                                            type="text" 
+                                            placeholder="ej. En Netflix, Av. Corrientes, Receta de pasta..." 
+                                            value={nuevoPlan.detalle} 
+                                            onChange={e => setNuevoPlan({...nuevoPlan, detalle: e.target.value})} 
+                                            className="w-full bg-[#FDFBF7] p-4 rounded-2xl text-xs outline-none text-[#4A3E3D] mt-1 border border-[#F0E6DF]" 
+                                        />
+                                    </div>
+                                    <div className="flex gap-3 pt-2">
+                                        <button 
+                                            type="button" 
+                                            onClick={() => setMostrarForm(false)} 
+                                            className="flex-1 bg-[#F2E8E1] text-[#8C7A78] py-3.5 rounded-2xl font-bold text-xs"
+                                        >
+                                            Cancelar
+                                        </button>
+                                        <button 
+                                            type="submit" 
+                                            className="flex-1 bg-[#E8A598] text-white py-3.5 rounded-2xl font-bold text-xs shadow-sm"
+                                        >
+                                            {planEditando ? "Actualizar" : "Guardar"}
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        )}
+                    </div>
+                );
+            }
+
+            // 5. MENÚ PRINCIPAL
             return (
                 <div className="min-h-screen pb-12 px-5 max-w-md mx-auto">
                     <header className="pt-8 pb-6 flex items-center justify-between">
                         <div>
-                            <h1 className="text-2xl font-bold text-[#4A3E3D] flex items-center gap-2">Nuestros planes ✨❤️</h1>
-                            <p className="text-xs text-[#8C7A78] mt-1">¿Qué hacemos hoy, {user.displayName.split(' ')[0]}?</p>
+                            <h1 className="text-2xl font-bold text-[#4A3E3D]">Nuestros planes ✨❤️</h1>
                         </div>
-                        <button onClick={logout} className="text-xs font-bold text-[#B39283] bg-white px-3 py-2 rounded-full soft-shadow">Salir</button>
+                        <button onClick={logout} className="text-xs font-bold text-[#B39283] bg-white px-3 py-1.5 rounded-full soft-card">
+                            Salir
+                        </button>
                     </header>
 
-                    <div className="space-y-4">
+                    <div className="space-y-3.5">
                         {CATEGORIAS.map(cat => (
-                            <div key={cat.id} onClick={() => setCategoria(cat)} className={`${cat.color} p-5 rounded-[2rem] cursor-pointer soft-shadow hover:shadow-md transition-all active:scale-95 flex items-center justify-between`}>
+                            <div 
+                                key={cat.id} 
+                                onClick={() => { setCategoria(cat); setFiltroEstado('todos'); }} 
+                                className={`${cat.color} ${cat.border} border p-5 rounded-[2rem] cursor-pointer soft-card hover:shadow-md transition-all active:scale-98 flex items-center justify-between`}
+                            >
                                 <div className="flex items-center gap-4">
-                                    <div className="text-3xl bg-white/60 p-3 rounded-2xl soft-shadow">{cat.icono}</div>
+                                    <div className="text-3xl bg-white/80 p-3 rounded-2xl shadow-sm">{cat.icono}</div>
                                     <div>
-                                        <h2 className={`font-bold text-lg ${cat.text}`}>{cat.titulo}</h2>
-                                        <p className="text-xs text-[#7A6B69] font-medium opacity-80">Ver y organizar</p>
+                                        <h2 className={`font-bold text-base ${cat.text}`}>{cat.titulo}</h2>
+                                        <p className="text-xs text-[#8C7A78] font-medium">Ver lista de planes</p>
                                     </div>
                                 </div>
-                                <span className={`text-xl ${cat.text} opacity-50`}>➔</span>
+                                <span className={`text-lg ${cat.text} opacity-60`}>➔</span>
                             </div>
                         ))}
-                        <div className="text-center pt-8"><span className="font-cursive text-5xl text-[#D88A8A] font-bold tracking-widest opacity-80">J&E</span></div>
+                        <div className="text-center pt-8">
+                            <span className="font-cursive text-5xl text-[#D88A8A] font-bold tracking-widest opacity-80">J&E</span>
+                        </div>
                     </div>
                 </div>
             );
