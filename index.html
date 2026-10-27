@@ -63,7 +63,7 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect } = React;
+        const { useState, useEffect, useMemo } = React;
 
         const firebaseConfig = {
             apiKey: "AIzaSyASEQnD0tZYJu-VZMzTITQp8JbPg-L1JX0",
@@ -102,7 +102,7 @@
             const now = new Date();
             const diffTime = Math.abs(now - date);
             const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-            if (diffDays === 0) return "Hoy ✨";
+            if (isNaN(diffDays) || diffDays === 0) return "Hoy ✨";
             if (diffDays === 1) return "Hace 1 día 🌸";
             return `Hace ${diffDays} días 📅`;
         };
@@ -140,7 +140,7 @@
             const [loading, setLoading] = useState(true);
             const [fraseActual, setFraseActual] = useState("");
             const [categoria, setCategoria] = useState(null);
-            const [planes, setPlanes] = useState([]);
+            const [todosLosPlanes, setTodosLosPlanes] = useState([]);
             const [planSeleccionado, setPlanSeleccionado] = useState(null);
             const [filtroEstado, setFiltroEstado] = useState('todos');
             
@@ -148,7 +148,6 @@
             const [planEditando, setPlanEditando] = useState(null);
             const [toastMensaje, setToastMensaje] = useState(null);
 
-            // Campos del formulario
             const [formCampos, setFormCampos] = useState({
                 titulo: '',
                 quienLaVio: 'Nadie',
@@ -170,39 +169,41 @@
                 setFraseActual(FRASES_CARGA[Math.floor(Math.random() * FRASES_CARGA.length)]);
                 const unsubscribe = auth.onAuthStateChanged((u) => {
                     setUser(u);
-                    setTimeout(() => setLoading(false), 2000);
+                    setTimeout(() => setLoading(false), 1500);
                 });
                 return () => unsubscribe();
             }, []);
 
-            // Notificación animada al guardar
             const mostrarToast = (mensaje) => {
                 setToastMensaje(mensaje);
-                setTimeout(() => {
-                    setToastMensaje(null);
-                }, 2800);
+                setTimeout(() => setToastMensaje(null), 2800);
             };
 
-            // Escuchar planes con filtro estricto por categoría seleccionada
+            // ESCUCHA GENERAL DE PLANES (Sin filtros restrictivos en Firebase)
             useEffect(() => {
-                if (!user || !categoria) {
-                    setPlanes([]);
-                    return;
-                }
+                if (!user) return;
 
-                setPlanes([]); // Limpieza inmediata al cambiar categoría
-                const unsub = db.collection('planes')
-                    .where('categoria', '==', categoria.id)
-                    .orderBy('fechaCreacion', 'desc')
-                    .onSnapshot(snapshot => {
-                        const data = snapshot.docs
-                            .map(doc => ({ id: doc.id, ...doc.data() }))
-                            .filter(plan => plan.categoria === categoria.id); // Garantía doble
-                        setPlanes(data);
-                    }, error => console.error("Error al cargar planes:", error));
+                const unsub = db.collection('planes').onSnapshot(snapshot => {
+                    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    setTodosLosPlanes(data);
+                }, error => console.error("Error al cargar datos:", error));
 
                 return () => unsub();
-            }, [categoria, user]);
+            }, [user]);
+
+            // Filtrar y ordenar planes en el cliente para rescatar planes antiguos sin categoria
+            const planesDeCategoria = useMemo(() => {
+                if (!categoria) return [];
+                return todosLosPlanes.filter(p => {
+                    // Si el plan no tiene guardada la categoría (creado en versiones anteriores), lo mostramos igual
+                    if (!p.categoria) return true; 
+                    return p.categoria === categoria.id;
+                }).sort((a, b) => {
+                    const timeA = a.fechaCreacion?.seconds ? a.fechaCreacion.seconds * 1000 : (a.fechaCreacion ? new Date(a.fechaCreacion).getTime() : 0);
+                    const timeB = b.fechaCreacion?.seconds ? b.fechaCreacion.seconds * 1000 : (b.fechaCreacion ? new Date(b.fechaCreacion).getTime() : 0);
+                    return timeB - timeA;
+                });
+            }, [todosLosPlanes, categoria]);
 
             useEffect(() => {
                 if (planSeleccionado && user) {
@@ -378,7 +379,7 @@
                 mostrarToast("¡Valoración guardada con éxito! ✨❤️");
             };
 
-            // 1. PANTALLA DE CARGA
+            // PANTALLA DE CARGA
             if (loading) return (
                 <div className="min-h-screen flex flex-col justify-between items-center p-8 text-center select-none bg-[#FDFBF7]">
                     <div className="pt-12">
@@ -398,7 +399,7 @@
                 </div>
             );
 
-            // 2. LOGIN
+            // LOGIN
             if (!user) return (
                 <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center bg-[#FDFBF7]">
                     <div className="w-full max-w-sm soft-card p-8 rounded-[2.5rem] space-y-6">
@@ -415,7 +416,7 @@
 
             return (
                 <div className="relative min-h-screen pb-10">
-                    {/* TOAST NOTIFICACIÓN ANIMADA */}
+                    {/* NOTIFICACIÓN TOAST */}
                     {toastMensaje && (
                         <div className="fixed top-5 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none">
                             <div className="bg-[#4A3E3D] text-[#FDFBF7] px-6 py-3 rounded-full text-xs font-bold shadow-xl animate-toast flex items-center gap-2 border border-[#6E5A58]">
@@ -424,7 +425,7 @@
                         </div>
                     )}
 
-                    {/* 3. DETALLE DEL PLAN Y RESEÑA */}
+                    {/* VISTA DETALLE DEL PLAN */}
                     {planSeleccionado && categoria ? (
                         <div className="p-5 max-w-md mx-auto">
                             <div className="flex items-center justify-between mb-4">
@@ -544,7 +545,7 @@
                             </div>
                         </div>
                     ) : categoria ? (
-                        /* 4. LISTA DE PLANES EN CATEGORÍA SELECCIONADA */
+                        /* VISTA CATEGORÍA SELECCIONADA */
                         <div className="p-5 max-w-md mx-auto">
                             <header className="flex items-center justify-between mb-5">
                                 <button onClick={() => { setCategoria(null); setPlanSeleccionado(null); }} className="text-xs font-bold text-[#8C7A78] bg-white px-4 py-2 rounded-full soft-card">
@@ -562,7 +563,7 @@
                                     onClick={() => setFiltroEstado('todos')} 
                                     className={`flex-1 py-2 rounded-full transition-all ${filtroEstado === 'todos' ? 'bg-white text-[#4A3E3D] shadow-sm' : ''}`}
                                 >
-                                    Todos ({planes.length})
+                                    Todos ({planesDeCategoria.length})
                                 </button>
                                 <button 
                                     onClick={() => setFiltroEstado('pendiente')} 
@@ -581,17 +582,17 @@
                             {!mostrarForm ? (
                                 <>
                                     <div className="space-y-3 mb-6">
-                                        {planes.filter(p => {
+                                        {planesDeCategoria.filter(p => {
                                             const miEstado = p.resenas && p.resenas[user.uid] ? p.resenas[user.uid].estado : 'Pendiente';
                                             if (filtroEstado === 'pendiente') return miEstado === 'Pendiente';
                                             if (filtroEstado === 'hecho') return miEstado === 'Hecho';
                                             return true;
                                         }).length === 0 ? (
                                             <div className="text-center p-8 soft-card rounded-3xl text-[#8C7A78] text-xs">
-                                                No hay planes guardados en {categoria.titulo} todavía. ¡Agregá uno nuevo! ✨
+                                                No hay planes en {categoria.titulo} todavía. ¡Agregá uno nuevo! ✨
                                             </div>
                                         ) : (
-                                            planes.filter(p => {
+                                            planesDeCategoria.filter(p => {
                                                 const miEstado = p.resenas && p.resenas[user.uid] ? p.resenas[user.uid].estado : 'Pendiente';
                                                 if (filtroEstado === 'pendiente') return miEstado === 'Pendiente';
                                                 if (filtroEstado === 'hecho') return miEstado === 'Hecho';
@@ -779,7 +780,7 @@
                             )}
                         </div>
                     ) : (
-                        /* 5. MENÚ PRINCIPAL DE CATEGORÍAS */
+                        /* MENÚ PRINCIPAL DE CATEGORÍAS */
                         <div className="p-5 max-w-md mx-auto">
                             <header className="pt-8 pb-6 flex items-center justify-between">
                                 <div>
