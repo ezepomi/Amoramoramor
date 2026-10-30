@@ -4,11 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Nuestros planes ✨❤️</title>
-    <!-- Ícono para el navegador y accesos directos -->
-<link rel="icon" type="image/png" href="IMG_cb2a5a9e-5e45-44d6-8e68-fb551f59394b.png">
-<link rel="apple-touch-icon" href="IMG_cb2a5a9e-5e45-44d6-8e68-fb551f59394b.png" >
-<meta name="theme-color" content="#000000">
-
 
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -36,9 +31,7 @@
             touch-action: manipulation;
             -webkit-tap-highlight-color: transparent;
         }
-        .font-cursive {
-            font-family: 'Caveat', cursive;
-        }
+        .font-cursive { font-family: 'Caveat', cursive; }
         @keyframes heartPulse {
             0%, 100% { transform: scale(1); }
             50% { transform: scale(1.25); }
@@ -52,9 +45,7 @@
             50% { transform: translateY(5px) scale(1.02); opacity: 1; }
             100% { transform: translateY(0) scale(1); opacity: 1; }
         }
-        .animate-toast {
-            animation: toastSlideIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-        }
+        .animate-toast { animation: toastSlideIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
 
         .soft-card {
             background: rgba(255, 255, 255, 0.88);
@@ -80,9 +71,7 @@
             measurementId: "G-CZY3VXDK08"
         };
 
-        if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
-        }
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
         const googleProvider = new firebase.auth.GoogleAuthProvider();
@@ -101,12 +90,19 @@
             { id: 'cocinar', titulo: 'Para Cocinar', icono: '👨‍🍳', color: 'bg-[#FCE2E6]', text: 'text-[#823A46]', border: 'border-[#F7C6CE]' }
         ];
 
+        const getMillis = (ts) => {
+            if (!ts) return Date.now();
+            if (ts.toMillis) return ts.toMillis();
+            if (ts.seconds) return ts.seconds * 1000;
+            if (ts instanceof Date) return ts.getTime();
+            const parsed = new Date(ts).getTime();
+            return isNaN(parsed) ? Date.now() : parsed;
+        };
+
         const calcularDias = (timestamp) => {
-            if (!timestamp) return "Reciente";
-            const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-            const now = new Date();
-            const diffTime = Math.abs(now - date);
-            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+            if (!timestamp) return "Hoy ✨";
+            const millis = getMillis(timestamp);
+            const diffDays = Math.floor(Math.abs(Date.now() - millis) / (1000 * 60 * 60 * 24));
             if (isNaN(diffDays) || diffDays === 0) return "Hoy ✨";
             if (diffDays === 1) return "Hace 1 día 🌸";
             return `Hace ${diffDays} días 📅`;
@@ -133,9 +129,7 @@
                         disabled={readOnly}
                         onClick={() => !readOnly && setRating(star)}
                         className={`text-2xl transition-transform ${!readOnly ? 'active:scale-125 cursor-pointer' : 'cursor-default'} ${star <= rating ? 'text-[#FBBF24]' : 'text-[#E5DCD6]'}`}
-                    >
-                        ★
-                    </button>
+                    >★</button>
                 ))}
             </div>
         );
@@ -144,6 +138,7 @@
             const [user, setUser] = useState(null);
             const [loading, setLoading] = useState(true);
             const [fraseActual, setFraseActual] = useState("");
+            const [vistaActual, setVistaActual] = useState('menu'); 
             const [categoria, setCategoria] = useState(null);
             const [todosLosPlanes, setTodosLosPlanes] = useState([]);
             const [planSeleccionado, setPlanSeleccionado] = useState(null);
@@ -154,675 +149,299 @@
             const [toastMensaje, setToastMensaje] = useState(null);
 
             const [formCampos, setFormCampos] = useState({
-                titulo: '',
-                quienLaVio: 'Nadie',
-                plataforma: '',
-                ubicacion: '',
-                diasHorarios: '',
-                agendarFecha: '',
-                fuePreviamente: 'Nadie',
-                especialidad: '',
-                ingredientes: '',
-                pasos: '',
-                linkReceta: ''
+                titulo: '', quienLaVio: 'Nadie', plataforma: '', ubicacion: '', diasHorarios: '',
+                agendarFecha: '', fuePreviamente: 'Nadie', especialidad: '', ingredientes: '', pasos: '', linkReceta: ''
             });
 
             const [miPuntaje, setMiPuntaje] = useState(5);
             const [miComentario, setMiComentario] = useState('');
+            const [miFotoUrl, setMiFotoUrl] = useState('');
 
             useEffect(() => {
                 setFraseActual(FRASES_CARGA[Math.floor(Math.random() * FRASES_CARGA.length)]);
                 const unsubscribe = auth.onAuthStateChanged((u) => {
                     setUser(u);
-                    setTimeout(() => setLoading(false), 1500);
+                    setTimeout(() => setLoading(false), 1200);
                 });
                 return () => unsubscribe();
             }, []);
 
-            const mostrarToast = (mensaje) => {
-                setToastMensaje(mensaje);
-                setTimeout(() => setToastMensaje(null), 2800);
-            };
-
-            // ESCUCHA GENERAL DE PLANES (Sin filtros restrictivos en Firebase)
             useEffect(() => {
                 if (!user) return;
-
                 const unsub = db.collection('planes').onSnapshot(snapshot => {
-                    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    setTodosLosPlanes(data);
-                }, error => console.error("Error al cargar datos:", error));
-
+                    setTodosLosPlanes(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                }, error => console.error("Error al cargar:", error));
                 return () => unsub();
             }, [user]);
 
-            // Filtrar y ordenar planes en el cliente para rescatar planes antiguos sin categoria
             const planesDeCategoria = useMemo(() => {
                 if (!categoria) return [];
-                return todosLosPlanes.filter(p => {
-                    // Si el plan no tiene guardada la categoría (creado en versiones anteriores), lo mostramos igual
-                    if (!p.categoria) return true; 
-                    return p.categoria === categoria.id;
-                }).sort((a, b) => {
-                    const timeA = a.fechaCreacion?.seconds ? a.fechaCreacion.seconds * 1000 : (a.fechaCreacion ? new Date(a.fechaCreacion).getTime() : 0);
-                    const timeB = b.fechaCreacion?.seconds ? b.fechaCreacion.seconds * 1000 : (b.fechaCreacion ? new Date(b.fechaCreacion).getTime() : 0);
-                    return timeB - timeA;
-                });
+                return todosLosPlanes.filter(p => p.categoria === categoria.id).sort((a, b) => getMillis(b.fechaCreacion) - getMillis(a.fechaCreacion));
             }, [todosLosPlanes, categoria]);
+
+            const planesRecuerdos = useMemo(() => {
+                return todosLosPlanes.filter(p => p.resenas && Object.values(p.resenas).some(r => r.estado === 'Hecho'))
+                                     .sort((a, b) => getMillis(b.fechaCreacion) - getMillis(a.fechaCreacion));
+            }, [todosLosPlanes]);
+
+            const proximoEvento = useMemo(() => {
+                const hoy = new Date().toISOString().split('T')[0];
+                const conFecha = todosLosPlanes.filter(p => p.agendarFecha && p.agendarFecha >= hoy);
+                if (conFecha.length === 0) return null;
+                return conFecha.sort((a, b) => new Date(a.agendarFecha) - new Date(b.agendarFecha))[0];
+            }, [todosLosPlanes]);
 
             useEffect(() => {
                 if (planSeleccionado && user) {
-                    const miResenaActual = planSeleccionado.resenas && planSeleccionado.resenas[user.uid];
-                    if (miResenaActual) {
-                        setMiPuntaje(miResenaActual.puntaje || 5);
-                        setMiComentario(miResenaActual.comentario || '');
-                    } else {
-                        setMiPuntaje(5);
-                        setMiComentario('');
-                    }
+                    const resena = planSeleccionado.resenas?.[user.uid];
+                    setMiPuntaje(resena?.puntaje || 5);
+                    setMiComentario(resena?.comentario || '');
+                    setMiFotoUrl(resena?.fotoUrl || '');
                 }
             }, [planSeleccionado, user]);
 
+            const mostrarToast = (mensaje) => { setToastMensaje(mensaje); setTimeout(() => setToastMensaje(null), 2800); };
             const login = () => auth.signInWithPopup(googleProvider).catch(err => alert(err.message));
             const logout = () => auth.signOut();
 
             const resetForm = () => {
-                setFormCampos({
-                    titulo: '',
-                    quienLaVio: 'Nadie',
-                    plataforma: '',
-                    ubicacion: '',
-                    diasHorarios: '',
-                    agendarFecha: '',
-                    fuePreviamente: 'Nadie',
-                    especialidad: '',
-                    ingredientes: '',
-                    pasos: '',
-                    linkReceta: ''
-                });
+                setFormCampos({ titulo: '', quienLaVio: 'Nadie', plataforma: '', ubicacion: '', diasHorarios: '', agendarFecha: '', fuePreviamente: 'Nadie', especialidad: '', ingredientes: '', pasos: '', linkReceta: '' });
                 setPlanEditando(null);
-            };
-
-            const seleccionarCategoria = (cat) => {
-                setPlanSeleccionado(null);
-                setMostrarForm(false);
-                resetForm();
-                setFiltroEstado('todos');
-                setCategoria(cat);
             };
 
             const guardarPlan = async (e) => {
                 e.preventDefault();
                 if (!formCampos.titulo || !categoria) return;
-
-                const datosBase = {
-                    categoria: categoria.id,
-                    titulo: formCampos.titulo,
-                    quienLaVio: formCampos.quienLaVio,
-                    plataforma: formCampos.plataforma,
-                    ubicacion: formCampos.ubicacion,
-                    diasHorarios: formCampos.diasHorarios,
-                    agendarFecha: formCampos.agendarFecha,
-                    fuePreviamente: formCampos.fuePreviamente,
-                    especialidad: formCampos.especialidad,
-                    ingredientes: formCampos.ingredientes,
-                    pasos: formCampos.pasos,
-                    linkReceta: formCampos.linkReceta
-                };
-
-                if (planEditando) {
-                    await db.collection('planes').doc(planEditando.id).update(datosBase);
-                    mostrarToast("¡Plan actualizado correctamente! ✨❤️");
-                } else {
-                    await db.collection('planes').add({
-                        ...datosBase,
-                        fechaCreacion: firebase.firestore.FieldValue.serverTimestamp(),
-                        creadoPor: user.displayName,
-                        resenas: {}
-                    });
-                    mostrarToast("¡Plan guardado con éxito! ✨❤️");
-                }
-
-                resetForm();
-                setMostrarForm(false);
-            };
-
-            const abrirEdicion = (plan, e) => {
-                e.stopPropagation();
-                setPlanEditando(plan);
-                setFormCampos({
-                    titulo: plan.titulo || '',
-                    quienLaVio: plan.quienLaVio || 'Nadie',
-                    plataforma: plan.plataforma || '',
-                    ubicacion: plan.ubicacion || '',
-                    diasHorarios: plan.diasHorarios || '',
-                    agendarFecha: plan.agendarFecha || '',
-                    fuePreviamente: plan.fuePreviamente || 'Nadie',
-                    especialidad: plan.especialidad || '',
-                    ingredientes: plan.ingredientes || '',
-                    pasos: plan.pasos || '',
-                    linkReceta: plan.linkReceta || ''
-                });
-                setMostrarForm(true);
-            };
-
-            const eliminarPlan = async (planId, e) => {
-                e.stopPropagation();
-                if (confirm("¿Querés eliminar este plan? 🗑️")) {
-                    await db.collection('planes').doc(planId).delete();
-                    mostrarToast("Plan eliminado 🗑️");
-                    if (planSeleccionado && planSeleccionado.id === planId) {
-                        setPlanSeleccionado(null);
+                const datosBase = { ...formCampos, categoria: categoria.id };
+                try {
+                    if (planEditando) {
+                        await db.collection('planes').doc(planEditando.id).update(datosBase);
+                        mostrarToast("¡Plan actualizado correctamente! ✨❤️");
+                    } else {
+                        await db.collection('planes').add({ ...datosBase, fechaCreacion: firebase.firestore.FieldValue.serverTimestamp(), creadoPor: user.displayName || 'Usuario', resenas: {} });
+                        mostrarToast("¡Plan guardado con éxito! ✨❤️");
                     }
-                }
+                    resetForm(); setMostrarForm(false);
+                } catch (err) { alert("⚠️ Error al guardar: " + err.message); }
             };
 
             const toggleEstadoPlan = async (plan) => {
-                const planRef = db.collection('planes').doc(plan.id);
-                const miResenaActual = plan.resenas && plan.resenas[user.uid];
-                const estadoActual = miResenaActual ? miResenaActual.estado : 'Pendiente';
+                const estadoActual = plan.resenas?.[user.uid]?.estado || 'Pendiente';
                 const nuevoEstado = estadoActual === 'Hecho' ? 'Pendiente' : 'Hecho';
-
-                await planRef.set({
-                    resenas: {
-                        [user.uid]: {
-                            nombre: user.displayName.split(' ')[0],
-                            puntaje: miResenaActual ? miResenaActual.puntaje : 5,
-                            comentario: miResenaActual ? miResenaActual.comentario : '',
-                            estado: nuevoEstado
-                        }
-                    }
+                await db.collection('planes').doc(plan.id).set({
+                    resenas: { [user.uid]: { nombre: user.displayName.split(' ')[0], puntaje: plan.resenas?.[user.uid]?.puntaje || 5, comentario: plan.resenas?.[user.uid]?.comentario || '', fotoUrl: plan.resenas?.[user.uid]?.fotoUrl || '', estado: nuevoEstado } }
                 }, { merge: true });
-
                 mostrarToast(nuevoEstado === 'Hecho' ? '¡Plan marcado como Hecho! ✅' : 'Plan marcado como Pendiente ⏳');
-
-                if (planSeleccionado && planSeleccionado.id === plan.id) {
-                    setPlanSeleccionado(prev => ({
-                        ...prev,
-                        resenas: {
-                            ...prev.resenas,
-                            [user.uid]: {
-                                nombre: user.displayName.split(' ')[0],
-                                puntaje: miResenaActual ? miResenaActual.puntaje : 5,
-                                comentario: miResenaActual ? miResenaActual.comentario : '',
-                                estado: nuevoEstado
-                            }
-                        }
-                    }));
-                }
+                if (planSeleccionado?.id === plan.id) setPlanSeleccionado(prev => ({ ...prev, resenas: { ...prev.resenas, [user.uid]: { ...prev.resenas?.[user.uid], estado: nuevoEstado } } }));
             };
 
             const guardarResena = async (e) => {
                 e.preventDefault();
                 if (!planSeleccionado) return;
-
-                const planRef = db.collection('planes').doc(planSeleccionado.id);
-                const miResenaActual = planSeleccionado.resenas && planSeleccionado.resenas[user.uid];
-                const miEstadoActual = miResenaActual ? miResenaActual.estado : 'Pendiente';
-
-                const nuevaResenaObj = {
-                    nombre: user.displayName.split(' ')[0],
-                    puntaje: Number(miPuntaje),
-                    comentario: miComentario,
-                    estado: miEstadoActual
-                };
-
-                await planRef.set({
-                    resenas: {
-                        [user.uid]: nuevaResenaObj
-                    }
-                }, { merge: true });
-
-                setPlanSeleccionado(prev => ({
-                    ...prev,
-                    resenas: {
-                        ...prev.resenas,
-                        [user.uid]: nuevaResenaObj
-                    }
-                }));
-
-                mostrarToast("¡Valoración guardada con éxito! ✨❤️");
+                const nuevaResena = { nombre: user.displayName.split(' ')[0], puntaje: Number(miPuntaje), comentario: miComentario, fotoUrl: miFotoUrl, estado: planSeleccionado.resenas?.[user.uid]?.estado || 'Pendiente' };
+                await db.collection('planes').doc(planSeleccionado.id).set({ resenas: { [user.uid]: nuevaResena } }, { merge: true });
+                setPlanSeleccionado(prev => ({ ...prev, resenas: { ...prev.resenas, [user.uid]: nuevaResena } }));
+                mostrarToast("¡Valoración y recuerdo guardados! ✨❤️");
             };
 
-            // PANTALLA DE CARGA
             if (loading) return (
                 <div className="min-h-screen flex flex-col justify-between items-center p-8 text-center select-none bg-[#FDFBF7]">
-                    <div className="pt-12">
-                        <span className="text-xs font-bold text-[#B39283] tracking-widest uppercase">Nuestros Planes</span>
-                    </div>
+                    <div className="pt-12"><span className="text-xs font-bold text-[#B39283] tracking-widest uppercase">Nuestros Planes</span></div>
                     <div className="flex flex-col items-center gap-6">
-                        <div className="flex items-center justify-center gap-3">
-                            <span className="text-3xl animate-heart-1">🌸</span>
-                            <span className="text-5xl animate-heart-2">💖</span>
-                            <span className="text-3xl animate-heart-3">✨</span>
-                        </div>
+                        <div className="flex items-center justify-center gap-3"><span className="text-3xl animate-heart-1">🌸</span><span className="text-5xl animate-heart-2">💖</span><span className="text-3xl animate-heart-3">✨</span></div>
                         <p className="text-base font-medium text-[#6E5A58] max-w-xs leading-relaxed italic">"{fraseActual}"</p>
                     </div>
-                    <div className="pb-6">
-                        <span className="font-cursive text-5xl text-[#D88A8A] font-bold tracking-wider">J&E</span>
-                    </div>
+                    <div className="pb-6"><span className="font-cursive text-5xl text-[#D88A8A] font-bold tracking-wider">J&E</span></div>
                 </div>
             );
 
-            // LOGIN
             if (!user) return (
                 <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center bg-[#FDFBF7]">
                     <div className="w-full max-w-sm soft-card p-8 rounded-[2.5rem] space-y-6">
                         <div className="text-5xl">✨❤️</div>
                         <h1 className="text-2xl font-bold text-[#4A3E3D]">Nuestros planes</h1>
                         <p className="text-xs text-[#8C7A78] leading-relaxed">Un espacio privado para organizar nuestras citas, pelis, lugares y momentos juntos.</p>
-                        <button onClick={login} className="w-full bg-[#E8A598] hover:bg-[#DF9789] text-white py-4 rounded-full font-semibold shadow-sm active:scale-95 transition-all">
-                            Ingresar con Google
-                        </button>
+                        <button onClick={login} className="w-full bg-[#E8A598] hover:bg-[#DF9789] text-white py-4 rounded-full font-semibold shadow-sm active:scale-95 transition-all">Ingresar con Google</button>
                     </div>
                     <span className="font-cursive text-4xl text-[#D88A8A] font-bold mt-8">J&E</span>
                 </div>
             );
 
             return (
-                <div className="relative min-h-screen pb-10">
-                    {/* NOTIFICACIÓN TOAST */}
-                    {toastMensaje && (
-                        <div className="fixed top-5 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none">
-                            <div className="bg-[#4A3E3D] text-[#FDFBF7] px-6 py-3 rounded-full text-xs font-bold shadow-xl animate-toast flex items-center gap-2 border border-[#6E5A58]">
-                                <span>{toastMensaje}</span>
+                <div className="relative min-h-screen pb-16">
+                    {toastMensaje && <div className="fixed top-5 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none"><div className="bg-[#4A3E3D] text-[#FDFBF7] px-6 py-3 rounded-full text-xs font-bold shadow-xl animate-toast flex items-center gap-2"><span>{toastMensaje}</span></div></div>}
+
+                    {vistaActual === 'menu' && (
+                        <div className="p-5 max-w-md mx-auto">
+                            <header className="pt-6 pb-4 flex items-center justify-between">
+                                <h1 className="text-2xl font-bold text-[#4A3E3D]">Nuestros planes ✨❤️</h1>
+                                <button onClick={logout} className="text-xs font-bold text-[#B39283] bg-white px-3 py-1.5 rounded-full soft-card">Salir</button>
+                            </header>
+
+                            <div className="mb-5">
+                                {proximoEvento ? (() => {
+                                    const diffDays = Math.ceil((new Date(proximoEvento.agendarFecha + 'T00:00:00') - new Date().setHours(0,0,0,0)) / (1000 * 60 * 60 * 24));
+                                    const textoCuenta = diffDays === 0 ? "¡ES HOY! 🎉" : diffDays === 1 ? "¡Es mañana! 🌸" : `Faltan ${diffDays} días ⏳`;
+                                    const catEncontrada = CATEGORIAS.find(c => c.id === proximoEvento.categoria) || CATEGORIAS[0];
+                                    return (
+                                        <div onClick={() => { setCategoria(catEncontrada); setPlanSeleccionado(proximoEvento); setVistaActual('detalle'); }} className="soft-card p-5 rounded-[2rem] cursor-pointer bg-gradient-to-br from-[#FFF5F3] to-white border border-[#F2D6D0] relative overflow-hidden active:scale-98 transition-all">
+                                            <div className="flex justify-between items-start mb-2"><span className="text-[10px] uppercase tracking-wider font-bold bg-[#E8A598] text-white px-3 py-1 rounded-full">Próximo Evento 🌸</span><span className="text-xs font-bold text-[#D88A8A]">{textoCuenta}</span></div>
+                                            <div className="flex items-center gap-3 mt-3"><span className="text-3xl bg-white p-2.5 rounded-2xl shadow-sm">{catEncontrada.icono}</span><div><h3 className="font-bold text-[#4A3E3D] text-base">{proximoEvento.titulo}</h3><p className="text-xs text-[#8C7A78] mt-0.5">📅 {proximoEvento.agendarFecha} {proximoEvento.ubicacion ? `• 📍 ${proximoEvento.ubicacion}` : ''}</p></div></div>
+                                        </div>
+                                    );
+                                })() : (
+                                    <div className="soft-card p-6 rounded-[2.5rem] text-center bg-gradient-to-br from-[#FCF9F2] to-white border border-[#EFE5DC]">
+                                        <p className="font-cursive text-2xl text-[#8C7A78] italic">"Mi plan favorito es verte reír"</p>
+                                        <p className="text-[10px] text-[#B3A29E] mt-1">Agendá una fecha en tus planes para ver la cuenta regresiva aquí ✨</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="mb-5">
+                                <button onClick={() => setVistaActual('recuerdos')} className="w-full bg-[#EAE4F2] text-[#5B4870] border border-[#D8CCE6] p-4 rounded-[2rem] font-bold text-xs flex items-center justify-between shadow-sm active:scale-98 transition-all">
+                                    <div className="flex items-center gap-3"><span className="text-2xl bg-white/80 p-2 rounded-xl">📖</span><div className="text-left"><h2 className="text-sm font-bold">Nuestros Recuerdos ✨</h2><p className="text-[10px] opacity-80">El álbum de nuestras citas cumplidas ({planesRecuerdos.length})</p></div></div><span className="text-lg">➔</span>
+                                </button>
+                            </div>
+
+                            <div className="space-y-3.5">
+                                {CATEGORIAS.map(cat => (
+                                    <div key={cat.id} onClick={() => { setCategoria(cat); setPlanSeleccionado(null); setMostrarForm(false); resetForm(); setFiltroEstado('todos'); setVistaActual('categoria'); }} className={`${cat.color} ${cat.border} border p-4.5 rounded-[2rem] cursor-pointer soft-card hover:shadow-md transition-all active:scale-98 flex items-center justify-between`}>
+                                        <div className="flex items-center gap-4"><div className="text-3xl bg-white/80 p-3 rounded-2xl shadow-sm">{cat.icono}</div><div><h2 className={`font-bold text-base ${cat.text}`}>{cat.titulo}</h2><p className="text-xs text-[#8C7A78] font-medium">Ver lista de planes</p></div></div><span className={`text-lg ${cat.text} opacity-60`}>➔</span>
+                                    </div>
+                                ))}
+                                <div className="text-center pt-6"><span className="font-cursive text-5xl text-[#D88A8A] font-bold tracking-widest opacity-80">J&E</span></div>
                             </div>
                         </div>
                     )}
 
-                    {/* VISTA DETALLE DEL PLAN */}
-                    {planSeleccionado && categoria ? (
-                        <div className="p-5 max-w-md mx-auto">
-                            <div className="flex items-center justify-between mb-4">
-                                <button onClick={() => setPlanSeleccionado(null)} className="text-xs font-bold text-[#8C7A78] bg-white px-4 py-2 rounded-full soft-card">
-                                    ⬅ Volver a {categoria.titulo}
-                                </button>
-                                <div className="flex gap-2">
-                                    <button onClick={(e) => abrirEdicion(planSeleccionado, e)} className="text-xs bg-white p-2 rounded-full soft-card">✏️</button>
-                                    <button onClick={(e) => eliminarPlan(planSeleccionado.id, e)} className="text-xs bg-white p-2 rounded-full soft-card">🗑️</button>
-                                </div>
-                            </div>
-                            
-                            <div className="soft-card p-6 rounded-[2.5rem] mb-5 text-center relative">
-                                <span className="text-4xl block mb-2">{categoria.icono}</span>
-                                <h2 className="text-2xl font-bold text-[#4A3E3D]">{planSeleccionado.titulo}</h2>
-
-                                <div className="mt-4 text-xs text-[#8C7A78] space-y-1.5 text-left bg-[#FDFBF7] p-4 rounded-2xl border border-[#F0E6DF]">
-                                    {categoria.id === 'pelis' && (
-                                        <>
-                                            <p>📺 <b>Plataforma:</b> {planSeleccionado.plataforma || 'No especificada'}</p>
-                                            <p>👁️ <b>¿Quién la vio?:</b> {planSeleccionado.quienLaVio || 'Nadie'}</p>
-                                        </>
-                                    )}
-                                    {categoria.id === 'lugares' && (
-                                        <>
-                                            <p>📍 <b>Ubicación:</b> {planSeleccionado.ubicacion || 'No especificada'}</p>
-                                            <p>🕒 <b>Días/Horarios:</b> {planSeleccionado.diasHorarios || 'No especificados'}</p>
-                                            {planSeleccionado.agendarFecha && <p>📅 <b>Fecha agendada:</b> {planSeleccionado.agendarFecha}</p>}
-                                            <p>🙋‍♂️ <b>¿Alguno fue previamente?:</b> {planSeleccionado.fuePreviamente || 'Nadie'}</p>
-                                        </>
-                                    )}
-                                    {categoria.id === 'espectaculos' && (
-                                        <>
-                                            <p>🎟️ <b>Ubicación/Lugar:</b> {planSeleccionado.ubicacion || 'No especificada'}</p>
-                                            <p>🕒 <b>Días/Horarios:</b> {planSeleccionado.diasHorarios || 'No especificados'}</p>
-                                            {planSeleccionado.agendarFecha && <p>📅 <b>Fecha agendada:</b> {planSeleccionado.agendarFecha}</p>}
-                                        </>
-                                    )}
-                                    {categoria.id === 'comer' && (
-                                        <>
-                                            <p>📍 <b>Ubicación:</b> {planSeleccionado.ubicacion || 'No especificada'}</p>
-                                            <p>🍕 <b>Especialidad:</b> {planSeleccionado.especialidad || 'No especificada'}</p>
-                                            <p>🕒 <b>Días/Horarios:</b> {planSeleccionado.diasHorarios || 'No especificados'}</p>
-                                            {planSeleccionado.agendarFecha && <p>📅 <b>Fecha agendada:</b> {planSeleccionado.agendarFecha}</p>}
-                                        </>
-                                    )}
-                                    {categoria.id === 'cocinar' && (
-                                        <>
-                                            <p>🛒 <b>Ingredientes:</b> {planSeleccionado.ingredientes || 'No especificados'}</p>
-                                            <p>👨‍🍳 <b>Pasos:</b> {planSeleccionado.pasos || 'No especificados'}</p>
-                                            {planSeleccionado.linkReceta && (
-                                                <p>🔗 <b>Link:</b> <a href={planSeleccionado.linkReceta} target="_blank" rel="noreferrer" className="text-[#D88A8A] underline font-bold">Ver receta online</a></p>
-                                            )}
-                                        </>
-                                    )}
-                                </div>
-
-                                <div className="flex items-center justify-center gap-2 mt-4 pt-4 border-t border-[#F2E8E1]">
-                                    <span className="text-xs font-bold text-[#8C7A78]">Estado para mí:</span>
-                                    <SwitchToggle 
-                                        checked={(planSeleccionado.resenas && planSeleccionado.resenas[user.uid]?.estado) === 'Hecho'} 
-                                        onChange={() => toggleEstadoPlan(planSeleccionado)} 
-                                    />
-                                </div>
-                            </div>
-
-                            {/* RESEÑAS PUBLICADAS */}
-                            <div className="space-y-3 mb-6">
-                                <h3 className="font-bold text-base text-[#4A3E3D] ml-2">Nuestras Reseñas y Valoraciones ✨</h3>
-                                {(!planSeleccionado.resenas || Object.keys(planSeleccionado.resenas).length === 0) ? (
-                                    <p className="text-xs text-[#8C7A78] ml-2 italic">Aún no hay opiniones guardadas.</p>
-                                ) : (
-                                    Object.values(planSeleccionado.resenas).map((r, idx) => (
-                                        <div key={idx} className="soft-card p-4 rounded-3xl">
-                                            <div className="flex justify-between items-center mb-1">
-                                                <span className="font-bold text-[#4A3E3D] text-sm">{r.nombre}</span>
-                                                <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${r.estado === 'Hecho' ? 'bg-[#E2F0D9] text-[#416132]' : 'bg-[#F2E8E1] text-[#8C7A78]'}`}>
-                                                    {r.estado}
-                                                </span>
-                                            </div>
-                                            {r.puntaje && (
-                                                <div className="text-[#FBBF24] text-xs mb-1">
-                                                    {"★".repeat(r.puntaje)}{"☆".repeat(5 - r.puntaje)} ({r.puntaje}/5)
-                                                </div>
-                                            )}
-                                            {r.comentario ? (
-                                                <p className="text-xs text-[#6E5A58] italic bg-[#FDFBF7] p-3 rounded-2xl border border-[#F0E6DF] mt-1">"{r.comentario}"</p>
-                                            ) : (
-                                                <p className="text-[10px] text-[#A3928E] italic">Sin reseña escrita.</p>
-                                            )}
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-
-                            {/* FORMULARIO DE RESEÑA */}
-                            <div className="soft-card p-6 rounded-[2.5rem]">
-                                <h3 className="font-bold text-sm text-[#4A3E3D] mb-1 text-center">Valorar y Dejar Reseña</h3>
-                                <p className="text-[10px] text-[#8C7A78] text-center mb-3">Elegí de 1 a 5 estrellas y dejá tu comentario</p>
-
-                                <form onSubmit={guardarResena} className="space-y-3">
-                                    <StarRating rating={miPuntaje} setRating={setMiPuntaje} />
-                                    <div>
-                                        <label className="text-[10px] font-bold text-[#8C7A78] ml-2">Tu Reseña / Comentario</label>
-                                        <textarea 
-                                            placeholder="¿Qué te pareció o qué expectativas tenés de este plan?" 
-                                            value={miComentario} 
-                                            onChange={e => setMiComentario(e.target.value)} 
-                                            className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl text-xs outline-none text-[#4A3E3D] border border-[#F0E6DF] resize-none mt-1" 
-                                            rows="3" 
-                                        ></textarea>
-                                    </div>
-                                    <button type="submit" className="w-full bg-[#B39283] text-white py-3.5 rounded-2xl text-xs font-bold active:scale-95 transition-all shadow-sm">
-                                        Guardar mi Valoración y Reseña
-                                    </button>
-                                </form>
-                            </div>
-                        </div>
-                    ) : categoria ? (
-                        /* VISTA CATEGORÍA SELECCIONADA */
+                    {vistaActual === 'categoria' && categoria && (
                         <div className="p-5 max-w-md mx-auto">
                             <header className="flex items-center justify-between mb-5">
-                                <button onClick={() => { setCategoria(null); setPlanSeleccionado(null); }} className="text-xs font-bold text-[#8C7A78] bg-white px-4 py-2 rounded-full soft-card">
-                                    ⬅ Categorías
-                                </button>
-                                <div className={`px-4 py-2 rounded-full ${categoria.color} ${categoria.text} ${categoria.border} border font-bold text-xs flex items-center gap-2 shadow-sm`}>
-                                    <span>{categoria.icono}</span>
-                                    <span>{categoria.titulo}</span>
-                                </div>
+                                <button onClick={() => setVistaActual('menu')} className="text-xs font-bold text-[#8C7A78] bg-white px-4 py-2 rounded-full soft-card">⬅ Menú Principal</button>
+                                <div className={`px-4 py-2 rounded-full ${categoria.color} ${categoria.text} ${categoria.border} border font-bold text-xs flex items-center gap-2 shadow-sm`}><span>{categoria.icono}</span><span>{categoria.titulo}</span></div>
                             </header>
 
-                            {/* Filtros */}
                             <div className="flex bg-[#F2E8E1] p-1 rounded-full mb-5 text-xs font-bold text-[#8C7A78]">
-                                <button 
-                                    onClick={() => setFiltroEstado('todos')} 
-                                    className={`flex-1 py-2 rounded-full transition-all ${filtroEstado === 'todos' ? 'bg-white text-[#4A3E3D] shadow-sm' : ''}`}
-                                >
-                                    Todos ({planesDeCategoria.length})
-                                </button>
-                                <button 
-                                    onClick={() => setFiltroEstado('pendiente')} 
-                                    className={`flex-1 py-2 rounded-full transition-all ${filtroEstado === 'pendiente' ? 'bg-white text-[#4A3E3D] shadow-sm' : ''}`}
-                                >
-                                    ⏳ Pendientes
-                                </button>
-                                <button 
-                                    onClick={() => setFiltroEstado('hecho')} 
-                                    className={`flex-1 py-2 rounded-full transition-all ${filtroEstado === 'hecho' ? 'bg-white text-[#4A3E3D] shadow-sm' : ''}`}
-                                >
-                                    ✅ Hechos
-                                </button>
+                                <button onClick={() => setFiltroEstado('todos')} className={`flex-1 py-2 rounded-full transition-all ${filtroEstado === 'todos' ? 'bg-white text-[#4A3E3D] shadow-sm' : ''}`}>Todos</button>
+                                <button onClick={() => setFiltroEstado('pendiente')} className={`flex-1 py-2 rounded-full transition-all ${filtroEstado === 'pendiente' ? 'bg-white text-[#4A3E3D] shadow-sm' : ''}`}>⏳ Pendientes</button>
+                                <button onClick={() => setFiltroEstado('hecho')} className={`flex-1 py-2 rounded-full transition-all ${filtroEstado === 'hecho' ? 'bg-white text-[#4A3E3D] shadow-sm' : ''}`}>✅ Hechos</button>
                             </div>
 
                             {!mostrarForm ? (
                                 <>
                                     <div className="space-y-3 mb-6">
-                                        {planesDeCategoria.filter(p => {
-                                            const miEstado = p.resenas && p.resenas[user.uid] ? p.resenas[user.uid].estado : 'Pendiente';
-                                            if (filtroEstado === 'pendiente') return miEstado === 'Pendiente';
-                                            if (filtroEstado === 'hecho') return miEstado === 'Hecho';
-                                            return true;
-                                        }).length === 0 ? (
-                                            <div className="text-center p-8 soft-card rounded-3xl text-[#8C7A78] text-xs">
-                                                No hay planes en {categoria.titulo} todavía. ¡Agregá uno nuevo! ✨
+                                        {planesDeCategoria.filter(p => filtroEstado === 'todos' || (filtroEstado === 'pendiente' && p.resenas?.[user.uid]?.estado !== 'Hecho') || (filtroEstado === 'hecho' && p.resenas?.[user.uid]?.estado === 'Hecho')).length === 0 ? (
+                                            <div className="text-center p-8 soft-card rounded-3xl text-[#8C7A78] text-xs">No hay planes filtrados en {categoria.titulo}. ¡Agregá uno nuevo! ✨</div>
+                                        ) : planesDeCategoria.filter(p => filtroEstado === 'todos' || (filtroEstado === 'pendiente' && p.resenas?.[user.uid]?.estado !== 'Hecho') || (filtroEstado === 'hecho' && p.resenas?.[user.uid]?.estado === 'Hecho')).map(plan => (
+                                            <div key={plan.id} onClick={() => { setPlanSeleccionado(plan); setVistaActual('detalle'); }} className="soft-card p-4 rounded-3xl flex items-center justify-between cursor-pointer active:scale-98 transition-all">
+                                                <div className="pr-2 flex-1">
+                                                    <div className="flex items-center gap-2 mb-1"><h3 className="font-bold text-[#4A3E3D] text-base">{plan.titulo}</h3><span className="text-[10px] text-[#A3928E] bg-[#F7EFEA] px-2 py-0.5 rounded-full font-medium">{calcularDias(plan.fechaCreacion)}</span></div>
+                                                    <p className="text-xs text-[#8C7A78] line-clamp-1">{categoria.id === 'pelis' && (plan.plataforma || 'Ver detalles')}{categoria.id === 'lugares' && (plan.ubicacion || 'Ver detalles')}{categoria.id === 'espectaculos' && (plan.ubicacion || 'Ver detalles')}{categoria.id === 'comer' && (plan.especialidad || plan.ubicacion || 'Ver detalles')}{categoria.id === 'cocinar' && (plan.ingredientes || 'Ver receta')}</p>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <SwitchToggle checked={plan.resenas?.[user.uid]?.estado === 'Hecho'} onChange={() => toggleEstadoPlan(plan)} />
+                                                    <button onClick={(e) => { e.stopPropagation(); setPlanEditando(plan); setFormCampos(plan); setMostrarForm(true); }} className="text-xs p-1 text-[#A3928E] hover:text-[#4A3E3D]">✏️</button>
+                                                    <button onClick={(e) => { e.stopPropagation(); if (confirm("¿Borrar plan? 🗑️")) db.collection('planes').doc(plan.id).delete(); }} className="text-xs p-1 text-[#A3928E] hover:text-red-400">🗑️</button>
+                                                </div>
                                             </div>
-                                        ) : (
-                                            planesDeCategoria.filter(p => {
-                                                const miEstado = p.resenas && p.resenas[user.uid] ? p.resenas[user.uid].estado : 'Pendiente';
-                                                if (filtroEstado === 'pendiente') return miEstado === 'Pendiente';
-                                                if (filtroEstado === 'hecho') return miEstado === 'Hecho';
-                                                return true;
-                                            }).map(plan => {
-                                                const miEstado = plan.resenas && plan.resenas[user.uid] ? plan.resenas[user.uid].estado : 'Pendiente';
-                                                return (
-                                                    <div 
-                                                        key={plan.id} 
-                                                        onClick={() => setPlanSeleccionado(plan)} 
-                                                        className="soft-card p-4 rounded-3xl flex items-center justify-between cursor-pointer active:scale-98 transition-all"
-                                                    >
-                                                        <div className="pr-2 flex-1">
-                                                            <div className="flex items-center gap-2 mb-1">
-                                                                <h3 className="font-bold text-[#4A3E3D] text-base">{plan.titulo}</h3>
-                                                                <span className="text-[10px] text-[#A3928E] bg-[#F7EFEA] px-2 py-0.5 rounded-full font-medium">
-                                                                    {calcularDias(plan.fechaCreacion)}
-                                                                </span>
-                                                            </div>
-                                                            <p className="text-xs text-[#8C7A78] line-clamp-1">
-                                                                {categoria.id === 'pelis' && (plan.plataforma || 'Ver detalles')}
-                                                                {categoria.id === 'lugares' && (plan.ubicacion || 'Ver detalles')}
-                                                                {categoria.id === 'espectaculos' && (plan.ubicacion || 'Ver detalles')}
-                                                                {categoria.id === 'comer' && (plan.especialidad || plan.ubicacion || 'Ver detalles')}
-                                                                {categoria.id === 'cocinar' && (plan.ingredientes || 'Ver receta')}
-                                                            </p>
-                                                        </div>
-
-                                                        <div className="flex items-center gap-2">
-                                                            <SwitchToggle 
-                                                                checked={miEstado === 'Hecho'} 
-                                                                onChange={() => toggleEstadoPlan(plan)} 
-                                                            />
-                                                            <button onClick={(e) => abrirEdicion(plan, e)} className="text-xs p-1 text-[#A3928E] hover:text-[#4A3E3D]">✏️</button>
-                                                            <button onClick={(e) => eliminarPlan(plan.id, e)} className="text-xs p-1 text-[#A3928E] hover:text-red-400">🗑️</button>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })
-                                        )}
+                                        ))}
                                     </div>
-
-                                    <button 
-                                        onClick={() => { resetForm(); setMostrarForm(true); }} 
-                                        className="w-full bg-[#4A3E3D] text-[#FDFBF7] py-4 rounded-full font-bold shadow-md active:scale-95 transition-all text-sm flex items-center justify-center gap-2"
-                                    >
-                                        <span>+</span> Agregar Plan en {categoria.titulo}
-                                    </button>
+                                    <button onClick={() => { resetForm(); setMostrarForm(true); }} className="w-full bg-[#4A3E3D] text-[#FDFBF7] py-4 rounded-full font-bold shadow-md active:scale-95 transition-all text-sm flex items-center justify-center gap-2"><span>+</span> Agregar Plan en {categoria.titulo}</button>
                                 </>
                             ) : (
-                                /* Formulario Dinámico */
                                 <div className="soft-card p-6 rounded-[2.5rem]">
-                                    <h3 className="font-bold text-[#4A3E3D] text-base mb-4 text-center">
-                                        {planEditando ? "Editar Plan ✏️" : `Nuevo Plan en ${categoria.titulo} 💖`}
-                                    </h3>
+                                    <h3 className="font-bold text-[#4A3E3D] text-base mb-4 text-center">{planEditando ? "Editar Plan ✏️" : `Nuevo Plan en ${categoria.titulo} 💖`}</h3>
                                     <form onSubmit={guardarPlan} className="space-y-3.5 text-xs">
-                                        <div>
-                                            <label className="font-bold text-[#8C7A78] ml-2">Nombre / Título *</label>
-                                            <input 
-                                                type="text" 
-                                                required 
-                                                placeholder="ej. Batman, Guerrin, Torta de frutilla..." 
-                                                value={formCampos.titulo} 
-                                                onChange={e => setFormCampos({...formCampos, titulo: e.target.value})} 
-                                                className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl font-bold outline-none text-[#4A3E3D] mt-1 border border-[#F0E6DF]" 
-                                            />
-                                        </div>
-
-                                        {categoria.id === 'pelis' && (
-                                            <>
-                                                <div>
-                                                    <label className="font-bold text-[#8C7A78] ml-2">Plataforma</label>
-                                                    <input type="text" placeholder="ej. Netflix, Max, Disney+, Cine" value={formCampos.plataforma} onChange={e => setFormCampos({...formCampos, plataforma: e.target.value})} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl outline-none text-[#4A3E3D] mt-1 border border-[#F0E6DF]" />
-                                                </div>
-                                                <div>
-                                                    <label className="font-bold text-[#8C7A78] ml-2">¿Quién la vio?</label>
-                                                    <select value={formCampos.quienLaVio} onChange={e => setFormCampos({...formCampos, quienLaVio: e.target.value})} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl font-bold outline-none text-[#4A3E3D] mt-1 border border-[#F0E6DF]">
-                                                        <option value="Nadie">Nadie</option>
-                                                        <option value="Eze">Eze</option>
-                                                        <option value="Juli">Juli</option>
-                                                        <option value="Ambos">Ambos</option>
-                                                    </select>
-                                                </div>
-                                            </>
-                                        )}
-
-                                        {categoria.id === 'lugares' && (
-                                            <>
-                                                <div>
-                                                    <label className="font-bold text-[#8C7A78] ml-2">Ubicación / Dirección</label>
-                                                    <input type="text" placeholder="ej. Tigre, San Telmo, Palermo" value={formCampos.ubicacion} onChange={e => setFormCampos({...formCampos, ubicacion: e.target.value})} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl outline-none text-[#4A3E3D] mt-1 border border-[#F0E6DF]" />
-                                                </div>
-                                                <div>
-                                                    <label className="font-bold text-[#8C7A78] ml-2">Días y Horarios</label>
-                                                    <input type="text" placeholder="ej. Mar a Dom 10 a 18 hs" value={formCampos.diasHorarios} onChange={e => setFormCampos({...formCampos, diasHorarios: e.target.value})} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl outline-none text-[#4A3E3D] mt-1 border border-[#F0E6DF]" />
-                                                </div>
-                                                <div>
-                                                    <label className="font-bold text-[#8C7A78] ml-2">Agendar Fecha (Opcional)</label>
-                                                    <input type="date" value={formCampos.agendarFecha} onChange={e => setFormCampos({...formCampos, agendarFecha: e.target.value})} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl outline-none text-[#4A3E3D] mt-1 border border-[#F0E6DF]" />
-                                                </div>
-                                                <div>
-                                                    <label className="font-bold text-[#8C7A78] ml-2">¿Alguno fue previamente?</label>
-                                                    <select value={formCampos.fuePreviamente} onChange={e => setFormCampos({...formCampos, fuePreviamente: e.target.value})} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl font-bold outline-none text-[#4A3E3D] mt-1 border border-[#F0E6DF]">
-                                                        <option value="Nadie">Nadie</option>
-                                                        <option value="Eze">Eze</option>
-                                                        <option value="Juli">Juli</option>
-                                                        <option value="Ambos">Ambos</option>
-                                                    </select>
-                                                </div>
-                                            </>
-                                        )}
-
-                                        {categoria.id === 'espectaculos' && (
-                                            <>
-                                                <div>
-                                                    <label className="font-bold text-[#8C7A78] ml-2">Ubicación / Estadio / Teatro</label>
-                                                    <input type="text" placeholder="ej. Movistar Arena, Gran Rex" value={formCampos.ubicacion} onChange={e => setFormCampos({...formCampos, ubicacion: e.target.value})} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl outline-none text-[#4A3E3D] mt-1 border border-[#F0E6DF]" />
-                                                </div>
-                                                <div>
-                                                    <label className="font-bold text-[#8C7A78] ml-2">Días y Horarios</label>
-                                                    <input type="text" placeholder="ej. Viernes 21 hs" value={formCampos.diasHorarios} onChange={e => setFormCampos({...formCampos, diasHorarios: e.target.value})} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl outline-none text-[#4A3E3D] mt-1 border border-[#F0E6DF]" />
-                                                </div>
-                                                <div>
-                                                    <label className="font-bold text-[#8C7A78] ml-2">Agendar Fecha del Evento</label>
-                                                    <input type="date" value={formCampos.agendarFecha} onChange={e => setFormCampos({...formCampos, agendarFecha: e.target.value})} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl outline-none text-[#4A3E3D] mt-1 border border-[#F0E6DF]" />
-                                                </div>
-                                            </>
-                                        )}
-
-                                        {categoria.id === 'comer' && (
-                                            <>
-                                                <div>
-                                                    <label className="font-bold text-[#8C7A78] ml-2">Ubicación / Barrio</label>
-                                                    <input type="text" placeholder="ej. Av. Corrientes, Palermo" value={formCampos.ubicacion} onChange={e => setFormCampos({...formCampos, ubicacion: e.target.value})} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl outline-none text-[#4A3E3D] mt-1 border border-[#F0E6DF]" />
-                                                </div>
-                                                <div>
-                                                    <label className="font-bold text-[#8C7A78] ml-2">Especialidad recomendada</label>
-                                                    <input type="text" placeholder="ej. Pizza de muzzarella, Pasta" value={formCampos.especialidad} onChange={e => setFormCampos({...formCampos, especialidad: e.target.value})} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl outline-none text-[#4A3E3D] mt-1 border border-[#F0E6DF]" />
-                                                </div>
-                                                <div>
-                                                    <label className="font-bold text-[#8C7A78] ml-2">Días y Horarios</label>
-                                                    <input type="text" placeholder="ej. Todos los días 12 a 00 hs" value={formCampos.diasHorarios} onChange={e => setFormCampos({...formCampos, diasHorarios: e.target.value})} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl outline-none text-[#4A3E3D] mt-1 border border-[#F0E6DF]" />
-                                                </div>
-                                                <div>
-                                                    <label className="font-bold text-[#8C7A78] ml-2">Agendar Fecha (Opcional)</label>
-                                                    <input type="date" value={formCampos.agendarFecha} onChange={e => setFormCampos({...formCampos, agendarFecha: e.target.value})} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl outline-none text-[#4A3E3D] mt-1 border border-[#F0E6DF]" />
-                                                </div>
-                                            </>
-                                        )}
-
-                                        {categoria.id === 'cocinar' && (
-                                            <>
-                                                <div>
-                                                    <label className="font-bold text-[#8C7A78] ml-2">Ingredientes principales</label>
-                                                    <textarea placeholder="ej. Harina, huevos, crema de leche..." value={formCampos.ingredientes} onChange={e => setFormCampos({...formCampos, ingredientes: e.target.value})} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl outline-none text-[#4A3E3D] mt-1 border border-[#F0E6DF] resize-none" rows="2"></textarea>
-                                                </div>
-                                                <div>
-                                                    <label className="font-bold text-[#8C7A78] ml-2">Pasos de la receta</label>
-                                                    <textarea placeholder="ej. 1. Mezclar todo. 2. Hornear..." value={formCampos.pasos} onChange={e => setFormCampos({...formCampos, pasos: e.target.value})} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl outline-none text-[#4A3E3D] mt-1 border border-[#F0E6DF] resize-none" rows="2"></textarea>
-                                                </div>
-                                                <div>
-                                                    <label className="font-bold text-[#8C7A78] ml-2">Link de receta online (Opcional)</label>
-                                                    <input type="url" placeholder="https://..." value={formCampos.linkReceta} onChange={e => setFormCampos({...formCampos, linkReceta: e.target.value})} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl outline-none text-[#4A3E3D] mt-1 border border-[#F0E6DF]" />
-                                                </div>
-                                            </>
-                                        )}
-
-                                        <div className="flex gap-3 pt-3">
-                                            <button 
-                                                type="button" 
-                                                onClick={() => { setMostrarForm(false); resetForm(); }} 
-                                                className="flex-1 bg-[#F2E8E1] text-[#8C7A78] py-3.5 rounded-2xl font-bold"
-                                            >
-                                                Cancelar
-                                            </button>
-                                            <button 
-                                                type="submit" 
-                                                className="flex-1 bg-[#E8A598] text-white py-3.5 rounded-2xl font-bold shadow-sm active:scale-95 transition-all"
-                                            >
-                                                {planEditando ? "Actualizar" : "Guardar"}
-                                            </button>
-                                        </div>
+                                        <div><label className="font-bold text-[#8C7A78] ml-2">Nombre / Título *</label><input type="text" required value={formCampos.titulo} onChange={e => setFormCampos({...formCampos, titulo: e.target.value})} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl font-bold outline-none border border-[#F0E6DF] mt-1" /></div>
+                                        {categoria.id === 'pelis' && (<><div><label className="font-bold text-[#8C7A78] ml-2">Plataforma</label><input type="text" value={formCampos.plataforma} onChange={e => setFormCampos({...formCampos, plataforma: e.target.value})} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl outline-none border border-[#F0E6DF] mt-1" /></div><div><label className="font-bold text-[#8C7A78] ml-2">¿Quién la vio?</label><select value={formCampos.quienLaVio} onChange={e => setFormCampos({...formCampos, quienLaVio: e.target.value})} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl font-bold border border-[#F0E6DF] mt-1"><option>Nadie</option><option>Eze</option><option>Juli</option><option>Ambos</option></select></div></>)}
+                                        {categoria.id === 'lugares' && (<><div><label className="font-bold text-[#8C7A78] ml-2">Ubicación</label><input type="text" value={formCampos.ubicacion} onChange={e => setFormCampos({...formCampos, ubicacion: e.target.value})} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl outline-none border border-[#F0E6DF] mt-1" /></div><div><label className="font-bold text-[#8C7A78] ml-2">Días y Horarios</label><input type="text" value={formCampos.diasHorarios} onChange={e => setFormCampos({...formCampos, diasHorarios: e.target.value})} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl outline-none border border-[#F0E6DF] mt-1" /></div><div><label className="font-bold text-[#8C7A78] ml-2">Agendar Fecha (Próximo Evento)</label><input type="date" value={formCampos.agendarFecha} onChange={e => setFormCampos({...formCampos, agendarFecha: e.target.value})} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl outline-none border border-[#F0E6DF] mt-1" /></div><div><label className="font-bold text-[#8C7A78] ml-2">¿Alguno fue previamente?</label><select value={formCampos.fuePreviamente} onChange={e => setFormCampos({...formCampos, fuePreviamente: e.target.value})} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl font-bold border border-[#F0E6DF] mt-1"><option>Nadie</option><option>Eze</option><option>Juli</option><option>Ambos</option></select></div></>)}
+                                        {categoria.id === 'espectaculos' && (<><div><label className="font-bold text-[#8C7A78] ml-2">Ubicación / Teatro</label><input type="text" value={formCampos.ubicacion} onChange={e => setFormCampos({...formCampos, ubicacion: e.target.value})} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl outline-none border border-[#F0E6DF] mt-1" /></div><div><label className="font-bold text-[#8C7A78] ml-2">Días y Horarios</label><input type="text" value={formCampos.diasHorarios} onChange={e => setFormCampos({...formCampos, diasHorarios: e.target.value})} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl outline-none border border-[#F0E6DF] mt-1" /></div><div><label className="font-bold text-[#8C7A78] ml-2">Agendar Fecha (Próximo Evento)</label><input type="date" value={formCampos.agendarFecha} onChange={e => setFormCampos({...formCampos, agendarFecha: e.target.value})} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl outline-none border border-[#F0E6DF] mt-1" /></div></>)}
+                                        {categoria.id === 'comer' && (<><div><label className="font-bold text-[#8C7A78] ml-2">Ubicación</label><input type="text" value={formCampos.ubicacion} onChange={e => setFormCampos({...formCampos, ubicacion: e.target.value})} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl outline-none border border-[#F0E6DF] mt-1" /></div><div><label className="font-bold text-[#8C7A78] ml-2">Especialidad</label><input type="text" value={formCampos.especialidad} onChange={e => setFormCampos({...formCampos, especialidad: e.target.value})} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl outline-none border border-[#F0E6DF] mt-1" /></div><div><label className="font-bold text-[#8C7A78] ml-2">Agendar Fecha (Próximo Evento)</label><input type="date" value={formCampos.agendarFecha} onChange={e => setFormCampos({...formCampos, agendarFecha: e.target.value})} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl outline-none border border-[#F0E6DF] mt-1" /></div></>)}
+                                        {categoria.id === 'cocinar' && (<><div><label className="font-bold text-[#8C7A78] ml-2">Ingredientes</label><textarea value={formCampos.ingredientes} onChange={e => setFormCampos({...formCampos, ingredientes: e.target.value})} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl outline-none border border-[#F0E6DF] mt-1 resize-none" rows="2"></textarea></div><div><label className="font-bold text-[#8C7A78] ml-2">Pasos</label><textarea value={formCampos.pasos} onChange={e => setFormCampos({...formCampos, pasos: e.target.value})} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl outline-none border border-[#F0E6DF] mt-1 resize-none" rows="2"></textarea></div><div><label className="font-bold text-[#8C7A78] ml-2">Link receta (URL)</label><input type="url" value={formCampos.linkReceta} onChange={e => setFormCampos({...formCampos, linkReceta: e.target.value})} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl outline-none border border-[#F0E6DF] mt-1" /></div></>)}
+                                        <div className="flex gap-3 pt-3"><button type="button" onClick={() => { setMostrarForm(false); resetForm(); }} className="flex-1 bg-[#F2E8E1] text-[#8C7A78] py-3.5 rounded-2xl font-bold">Cancelar</button><button type="submit" className="flex-1 bg-[#E8A598] text-white py-3.5 rounded-2xl font-bold shadow-sm">Guardar</button></div>
                                     </form>
                                 </div>
                             )}
                         </div>
-                    ) : (
-                        /* MENÚ PRINCIPAL DE CATEGORÍAS */
-                        <div className="p-5 max-w-md mx-auto">
-                            <header className="pt-8 pb-6 flex items-center justify-between">
-                                <div>
-                                    <h1 className="text-2xl font-bold text-[#4A3E3D]">Nuestros planes ✨❤️</h1>
-                                </div>
-                                <button onClick={logout} className="text-xs font-bold text-[#B39283] bg-white px-3 py-1.5 rounded-full soft-card">
-                                    Salir
-                                </button>
-                            </header>
+                    )}
 
-                            <div className="space-y-3.5">
-                                {CATEGORIAS.map(cat => (
-                                    <div 
-                                        key={cat.id} 
-                                        onClick={() => seleccionarCategoria(cat)} 
-                                        className={`${cat.color} ${cat.border} border p-5 rounded-[2rem] cursor-pointer soft-card hover:shadow-md transition-all active:scale-98 flex items-center justify-between`}
-                                    >
-                                        <div className="flex items-center gap-4">
-                                            <div className="text-3xl bg-white/80 p-3 rounded-2xl shadow-sm">{cat.icono}</div>
-                                            <div>
-                                                <h2 className={`font-bold text-base ${cat.text}`}>{cat.titulo}</h2>
-                                                <p className="text-xs text-[#8C7A78] font-medium">Ver lista de planes</p>
+                    {vistaActual === 'detalle' && planSeleccionado && (() => {
+                        const catPlan = CATEGORIAS.find(c => c.id === planSeleccionado.categoria) || CATEGORIAS[0];
+                        const resenas = Object.values(planSeleccionado.resenas || {});
+                        const resenasConPuntaje = resenas.filter(r => r.puntaje > 0);
+                        const ratingPareja = resenasConPuntaje.length > 0 ? (resenasConPuntaje.reduce((a, r) => a + r.puntaje, 0) / resenasConPuntaje.length).toFixed(1) : null;
+                        return (
+                            <div className="p-5 max-w-md mx-auto">
+                                <div className="flex items-center justify-between mb-4"><button onClick={() => setVistaActual(categoria ? 'categoria' : 'menu')} className="text-xs font-bold text-[#8C7A78] bg-white px-4 py-2 rounded-full soft-card">⬅ Volver</button></div>
+                                <div className="soft-card p-6 rounded-[2.5rem] mb-5 text-center relative">
+                                    <span className="text-4xl block mb-2">{catPlan.icono}</span>
+                                    <h2 className="text-2xl font-bold text-[#4A3E3D]">{planSeleccionado.titulo}</h2>
+                                    <div className="mt-4 text-xs text-[#8C7A78] space-y-1.5 text-left bg-[#FDFBF7] p-4 rounded-2xl border border-[#F0E6DF]">
+                                        {catPlan.id === 'pelis' && (<><p>📺 <b>Plataforma:</b> {planSeleccionado.plataforma}</p><p>👁️ <b>Vio:</b> {planSeleccionado.quienLaVio}</p></>)}
+                                        {catPlan.id === 'lugares' && (<><p>📍 <b>Ubicación:</b> {planSeleccionado.ubicacion}</p><p>📅 <b>Fecha:</b> {planSeleccionado.agendarFecha}</p></>)}
+                                        {catPlan.id === 'espectaculos' && (<><p>🎟️ <b>Ubicación:</b> {planSeleccionado.ubicacion}</p><p>📅 <b>Fecha:</b> {planSeleccionado.agendarFecha}</p></>)}
+                                        {catPlan.id === 'comer' && (<><p>📍 <b>Ubicación:</b> {planSeleccionado.ubicacion}</p><p>📅 <b>Fecha:</b> {planSeleccionado.agendarFecha}</p></>)}
+                                        {catPlan.id === 'cocinar' && (<><p>🛒 <b>Ingredientes:</b> {planSeleccionado.ingredientes}</p>{planSeleccionado.linkReceta && <a href={planSeleccionado.linkReceta} target="_blank" className="text-[#D88A8A] underline">Ver receta online</a>}</>)}
+                                    </div>
+                                    <div className="flex items-center justify-center gap-2 mt-4 pt-4 border-t border-[#F2E8E1]"><span className="text-xs font-bold text-[#8C7A78]">Estado para mí:</span><SwitchToggle checked={planSeleccionado.resenas?.[user.uid]?.estado === 'Hecho'} onChange={() => toggleEstadoPlan(planSeleccionado)} /></div>
+                                    {ratingPareja && <div className="mt-4 bg-[#FFF0F2] inline-block px-4 py-2 rounded-full text-[#D88A8A] font-bold text-xs shadow-sm">💕 Puntuación Pareja: {ratingPareja} / 5 ⭐</div>}
+                                </div>
+
+                                <div className="space-y-3 mb-6">
+                                    <h3 className="font-bold text-base text-[#4A3E3D] ml-2">Nuestras Reseñas ✨</h3>
+                                    {resenas.length === 0 ? <p className="text-xs text-[#8C7A78] ml-2 italic">Sin opiniones aún.</p> : resenas.map((r, idx) => (
+                                        <div key={idx} className="soft-card p-4 rounded-3xl space-y-2">
+                                            <div className="flex justify-between items-center"><span className="font-bold text-sm">{r.nombre}</span><span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${r.estado === 'Hecho' ? 'bg-[#E2F0D9] text-[#416132]' : 'bg-[#F2E8E1] text-[#8C7A78]'}`}>{r.estado}</span></div>
+                                            {r.puntaje > 0 && <div className="text-[#FBBF24] text-xs">{"★".repeat(r.puntaje)}{"☆".repeat(5 - r.puntaje)}</div>}
+                                            {r.comentario && <p className="text-xs text-[#6E5A58] italic bg-[#FDFBF7] p-3 rounded-2xl border border-[#F0E6DF]">"{r.comentario}"</p>}
+                                            {r.fotoUrl && <img src={r.fotoUrl} alt="Cita" className="w-full h-48 object-cover rounded-2xl mt-2 border border-[#F0E6DF]" />}
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="soft-card p-6 rounded-[2.5rem]">
+                                    <h3 className="font-bold text-sm text-[#4A3E3D] mb-1 text-center">Valorar y Dejar Reseña</h3>
+                                    <form onSubmit={guardarResena} className="space-y-3">
+                                        <StarRating rating={miPuntaje} setRating={setMiPuntaje} />
+                                        <textarea placeholder="¿Qué te pareció este plan?" value={miComentario} onChange={e => setMiComentario(e.target.value)} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl text-xs outline-none border border-[#F0E6DF] resize-none mt-1" rows="3"></textarea>
+                                        <input type="url" placeholder="🔗 Link de foto (Google Fotos/Drive)" value={miFotoUrl} onChange={e => setMiFotoUrl(e.target.value)} className="w-full bg-[#FDFBF7] p-3.5 rounded-2xl text-xs outline-none border border-[#F0E6DF] mt-1" />
+                                        <button type="submit" className="w-full bg-[#B39283] text-white py-3.5 rounded-2xl text-xs font-bold shadow-sm">Guardar mi Valoración</button>
+                                    </form>
+                                </div>
+                            </div>
+                        );
+                    })()}
+
+                    {vistaActual === 'recuerdos' && (
+                        <div className="p-5 max-w-md mx-auto">
+                            <header className="flex items-center justify-between mb-5"><button onClick={() => setVistaActual('menu')} className="text-xs font-bold text-[#8C7A78] bg-white px-4 py-2 rounded-full soft-card">⬅ Menú Principal</button><div className="px-4 py-2 rounded-full bg-[#EAE4F2] text-[#5B4870] border border-[#D8CCE6] font-bold text-xs shadow-sm">📖 Nuestros Recuerdos</div></header>
+                            <div className="space-y-4">
+                                {planesRecuerdos.length === 0 ? <div className="text-center p-8 soft-card rounded-3xl text-[#8C7A78] text-xs">Sin recuerdos aún. Cuando marquen un plan como "Hecho" ✅, aparecerá aquí ✨</div> : planesRecuerdos.map(plan => {
+                                    const catRecuerdo = CATEGORIAS.find(c => c.id === plan.categoria) || CATEGORIAS[0];
+                                    const resenasArr = Object.values(plan.resenas || {});
+                                    const foto = resenasArr.find(r => r.fotoUrl)?.fotoUrl;
+                                    return (
+                                        <div key={plan.id} onClick={() => { setPlanSeleccionado(plan); setVistaActual('detalle'); }} className="soft-card p-5 rounded-[2.5rem] cursor-pointer active:scale-98 transition-all space-y-3">
+                                            <div className="flex justify-between items-center"><span className="text-[10px] text-[#A3928E] bg-[#F7EFEA] px-2.5 py-1 rounded-full font-bold">{calcularDias(plan.fechaCreacion)}</span><span className="text-xl">{catRecuerdo.icono}</span></div>
+                                            <div><h3 className="font-bold text-[#4A3E3D] text-lg">{plan.titulo}</h3><p className="text-xs text-[#8C7A78]">{catRecuerdo.titulo}</p></div>
+                                            {foto && <img src={foto} alt="Recuerdo" className="w-full h-52 object-cover rounded-2xl border border-[#F0E6DF]" />}
+                                            <div className="space-y-2 pt-2 border-t border-[#F2E8E1]">
+                                                {resenasArr.map((r, i) => (
+                                                    <div key={i} className="text-xs bg-[#FDFBF7] p-3 rounded-2xl border border-[#F0E6DF]">
+                                                        <div className="flex justify-between font-bold text-[#4A3E3D] mb-1"><span>{r.nombre} {r.puntaje ? `(${r.puntaje}★)` : ''}</span><span className="text-[10px] text-[#8C7A78]">{r.estado}</span></div>
+                                                        {r.comentario && <p className="text-[#6E5A58] italic">"{r.comentario}"</p>}
+                                                    </div>
+                                                ))}
                                             </div>
                                         </div>
-                                        <span className={`text-lg ${cat.text} opacity-60`}>➔</span>
-                                    </div>
-                                ))}
-                                <div className="text-center pt-8">
-                                    <span className="font-cursive text-5xl text-[#D88A8A] font-bold tracking-widest opacity-80">J&E</span>
-                                </div>
+                                    );
+                                })}
                             </div>
                         </div>
                     )}
                 </div>
             );
         };
-
         ReactDOM.createRoot(document.getElementById('root')).render(<App />);
     </script>
 </body>
