@@ -458,7 +458,7 @@ const convertirLinkDrive = (url) => {
                                         <div key={plan.id} onClick={() => { setPlanSeleccionado(plan); setVistaActual('detalle'); }} className="soft-card p-5 rounded-[2.5rem] cursor-pointer active:scale-98 transition-all space-y-3">
                                             <div className="flex justify-between items-center"><span className="text-[10px] text-[#A3928E] bg-[#F7EFEA] px-2.5 py-1 rounded-full font-bold">{calcularDias(plan.fechaCreacion)}</span><span className="text-xl">{catRecuerdo.icono}</span></div>
                                             <div><h3 className="font-bold text-[#4A3E3D] text-lg">{plan.titulo}</h3><p className="text-xs text-[#8C7A78]">{catRecuerdo.titulo}</p></div>
-                                            {foto && {foto && (
+                                             {foto && (
     <img
         src={convertirLinkDrive(foto)}
         alt="Recuerdo"
