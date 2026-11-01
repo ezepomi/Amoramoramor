@@ -92,7 +92,7 @@
             { id: 'cocinar', titulo: 'Para Cocinar', icono: '👨‍🍳', color: 'bg-[#FCE2E6]', text: 'text-[#823A46]', border: 'border-[#F7C6CE]' }
         ];
 
-        // Convierte enlaces compartidos de Google Drive en enlaces para mostrar imágenes.
+                // Convierte enlaces compartidos de Google Drive en enlaces para mostrar imágenes (Actualizado).
         const convertirLinkDrive = (url) => {
             if (!url || typeof url !== 'string') return '';
             const urlLimpia = url.trim();
@@ -101,7 +101,9 @@
                 if (link.hostname === 'drive.google.com' || link.hostname === 'www.drive.google.com') {
                     const match = link.pathname.match(/\/file\/d\/([^/]+)/);
                     const id = match?.[1] || link.searchParams.get('id');
-                    if (id) return `https://drive.google.com/uc?export=view&id=${id}`;
+                    
+                    // Nuevo formato de enlace habilitado por Google Drive 
+                    if (id) return `https://lh3.googleusercontent.com/d/${id}`;
                 }
                 return urlLimpia;
             } catch (error) {
