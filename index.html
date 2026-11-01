@@ -89,7 +89,32 @@
             { id: 'comer', titulo: 'Salir a Comer', icono: '🍽️', color: 'bg-[#FCF4DD]', text: 'text-[#7A6221]', border: 'border-[#F7E7B8]' },
             { id: 'cocinar', titulo: 'Para Cocinar', icono: '👨‍🍳', color: 'bg-[#FCE2E6]', text: 'text-[#823A46]', border: 'border-[#F7C6CE]' }
         ];
+// Convierte enlaces compartidos de Google Drive en enlaces para mostrar imágenes.
+const convertirLinkDrive = (url) => {
+    if (!url || typeof url !== 'string') return '';
 
+    const urlLimpia = url.trim();
+
+    try {
+        const link = new URL(urlLimpia);
+
+        if (
+            link.hostname === 'drive.google.com' ||
+            link.hostname === 'www.drive.google.com'
+        ) {
+            const match = link.pathname.match(/\/file\/d\/([^/]+)/);
+            const id = match?.[1] || link.searchParams.get('id');
+
+            if (id) {
+                return `https://drive.google.com/uc?export=view&id=${id}`;
+            }
+        }
+
+        return urlLimpia;
+    } catch (error) {
+        return urlLimpia;
+    }
+};
         const getMillis = (ts) => {
             if (!ts) return Date.now();
             if (ts.toMillis) return ts.toMillis();
@@ -394,7 +419,16 @@
                                             <div className="flex justify-between items-center"><span className="font-bold text-sm">{r.nombre}</span><span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${r.estado === 'Hecho' ? 'bg-[#E2F0D9] text-[#416132]' : 'bg-[#F2E8E1] text-[#8C7A78]'}`}>{r.estado}</span></div>
                                             {r.puntaje > 0 && <div className="text-[#FBBF24] text-xs">{"★".repeat(r.puntaje)}{"☆".repeat(5 - r.puntaje)}</div>}
                                             {r.comentario && <p className="text-xs text-[#6E5A58] italic bg-[#FDFBF7] p-3 rounded-2xl border border-[#F0E6DF]">"{r.comentario}"</p>}
-                                            {r.fotoUrl && <img src={r.fotoUrl} alt="Cita" className="w-full h-48 object-cover rounded-2xl mt-2 border border-[#F0E6DF]" />}
+                                            {r.fotoUrl && (
+    <img
+        src={convertirLinkDrive(r.fotoUrl)}
+        alt="Cita"
+        className="w-full h-48 object-cover rounded-2xl mt-2 border border-[#F0E6DF]"
+        onError={(e) => {
+            e.currentTarget.style.display = 'none';
+        }}
+    />
+)}
                                         </div>
                                     ))}
                                 </div>
@@ -424,7 +458,16 @@
                                         <div key={plan.id} onClick={() => { setPlanSeleccionado(plan); setVistaActual('detalle'); }} className="soft-card p-5 rounded-[2.5rem] cursor-pointer active:scale-98 transition-all space-y-3">
                                             <div className="flex justify-between items-center"><span className="text-[10px] text-[#A3928E] bg-[#F7EFEA] px-2.5 py-1 rounded-full font-bold">{calcularDias(plan.fechaCreacion)}</span><span className="text-xl">{catRecuerdo.icono}</span></div>
                                             <div><h3 className="font-bold text-[#4A3E3D] text-lg">{plan.titulo}</h3><p className="text-xs text-[#8C7A78]">{catRecuerdo.titulo}</p></div>
-                                            {foto && <img src={foto} alt="Recuerdo" className="w-full h-52 object-cover rounded-2xl border border-[#F0E6DF]" />}
+                                            {foto && {foto && (
+    <img
+        src={convertirLinkDrive(foto)}
+        alt="Recuerdo"
+        className="w-full h-52 object-cover rounded-2xl border border-[#F0E6DF]"
+        onError={(e) => {
+            e.currentTarget.style.display = 'none';
+        }}
+    />
+)}
                                             <div className="space-y-2 pt-2 border-t border-[#F2E8E1]">
                                                 {resenasArr.map((r, i) => (
                                                     <div key={i} className="text-xs bg-[#FDFBF7] p-3 rounded-2xl border border-[#F0E6DF]">
