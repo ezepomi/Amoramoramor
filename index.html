@@ -179,14 +179,36 @@
             const [miComentario, setMiComentario] = useState('');
             const [miFotoUrl, setMiFotoUrl] = useState('');
 
-            useEffect(() => {
-                setFraseActual(FRASES_CARGA[Math.floor(Math.random() * FRASES_CARGA.length)]);
+                        useEffect(() => {
+                // 1. Traemos la "bolsa" de frases pendientes de la memoria del navegador
+                let pendientes = JSON.parse(localStorage.getItem('frasesPendientes_JE')) || [];
+
+                // 2. Si la bolsa está vacía (o es la primera vez), la llenamos con todas las frases
+                if (pendientes.length === 0) {
+                    pendientes = [...FRASES_CARGA];
+                }
+
+                // 3. Elegimos una al azar de las que quedan disponibles
+                const indiceAleatorio = Math.floor(Math.random() * pendientes.length);
+                const fraseElegida = pendientes[indiceAleatorio];
+
+                // 4. La quitamos de la lista para que no se repita
+                pendientes.splice(indiceAleatorio, 1);
+
+                // 5. Guardamos la nueva lista en la memoria
+                localStorage.setItem('frasesPendientes_JE', JSON.stringify(pendientes));
+
+                // 6. Mostramos la frase en pantalla
+                setFraseActual(fraseElegida);
+
+                // --- Autenticación (esto lo dejamos tal cual estaba) ---
                 const unsubscribe = auth.onAuthStateChanged((u) => {
                     setUser(u);
                     setTimeout(() => setLoading(false), 1200);
                 });
                 return () => unsubscribe();
             }, []);
+
 
             useEffect(() => {
                 if (!user) return;
