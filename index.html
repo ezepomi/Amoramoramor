@@ -81,9 +81,9 @@
             "Por ti, baby, sería Batman. 🦇❤️",
             "No soy muy inteligente pero sé lo que es el amor. 🧸",
             "Irradio luces de colores. 🎆🪅",
-        "Lejos estaba Ryan Gosling de la tierra en Proyect Hail Mary. 🚀🧑‍🚀",
-"Táctica y estrategia,Mario Benedetti. ✍️💖",
-"Vemos el mismo sol y la misma luna. ❤️🌕☀️"
+            "Lejos estaba Ryan Gosling de la tierra en Proyect Hail Mary. 🚀🧑‍🚀",
+            "Táctica y estrategia,Mario Benedetti. ✍️💖",
+            "Vemos el mismo sol y la misma luna. ❤️🌕☀️"
         ];
 
         const CATEGORIAS = [
@@ -94,7 +94,7 @@
             { id: 'cocinar', titulo: 'Para Cocinar', icono: '👨‍🍳', color: 'bg-[#FCE2E6]', text: 'text-[#823A46]', border: 'border-[#F7C6CE]' }
         ];
 
-                // Convierte enlaces compartidos de Google Drive en enlaces para mostrar imágenes (Actualizado).
+        // Convierte enlaces compartidos de Google Drive en enlaces para mostrar imágenes (Actualizado).
         const convertirLinkDrive = (url) => {
             if (!url || typeof url !== 'string') return '';
             const urlLimpia = url.trim();
@@ -103,7 +103,7 @@
                 if (link.hostname === 'drive.google.com' || link.hostname === 'www.drive.google.com') {
                     const match = link.pathname.match(/\/file\/d\/([^/]+)/);
                     const id = match?.[1] || link.searchParams.get('id');
-                    
+
                     // Nuevo formato de enlace habilitado por Google Drive 
                     if (id) return `https://lh3.googleusercontent.com/d/${id}`;
                 }
@@ -166,7 +166,7 @@
             const [todosLosPlanes, setTodosLosPlanes] = useState([]);
             const [planSeleccionado, setPlanSeleccionado] = useState(null);
             const [filtroEstado, setFiltroEstado] = useState('todos');
-            
+
             const [mostrarForm, setMostrarForm] = useState(false);
             const [planEditando, setPlanEditando] = useState(null);
             const [toastMensaje, setToastMensaje] = useState(null);
@@ -180,7 +180,7 @@
             const [miComentario, setMiComentario] = useState('');
             const [miFotoUrl, setMiFotoUrl] = useState('');
 
-                        useEffect(() => {
+            useEffect(() => {
                 // 1. Traemos la "bolsa" de frases pendientes de la memoria del navegador
                 let pendientes = JSON.parse(localStorage.getItem('frasesPendientes_JE')) || [];
 
@@ -202,14 +202,13 @@
                 // 6. Mostramos la frase en pantalla
                 setFraseActual(fraseElegida);
 
-                // --- Autenticación (esto lo dejamos tal cual estaba) ---
+                // --- Autenticación ---
                 const unsubscribe = auth.onAuthStateChanged((u) => {
                     setUser(u);
                     setTimeout(() => setLoading(false), 1200);
                 });
                 return () => unsubscribe();
             }, []);
-
 
             useEffect(() => {
                 if (!user) return;
@@ -224,9 +223,10 @@
                 return todosLosPlanes.filter(p => p.categoria === categoria.id).sort((a, b) => getMillis(b.fechaCreacion) - getMillis(a.fechaCreacion));
             }, [todosLosPlanes, categoria]);
 
+            // Ordena los recuerdos por fechaHecho (más reciente primero), con respaldo en fechaCreacion
             const planesRecuerdos = useMemo(() => {
                 return todosLosPlanes.filter(p => p.resenas && Object.values(p.resenas).some(r => r.estado === 'Hecho'))
-                                     .sort((a, b) => getMillis(b.fechaCreacion) - getMillis(a.fechaCreacion));
+                                     .sort((a, b) => getMillis(b.fechaHecho || b.fechaCreacion) - getMillis(a.fechaHecho || a.fechaCreacion));
             }, [todosLosPlanes]);
 
             const proximoEvento = useMemo(() => {
@@ -273,11 +273,38 @@
             const toggleEstadoPlan = async (plan) => {
                 const estadoActual = plan.resenas?.[user.uid]?.estado || 'Pendiente';
                 const nuevoEstado = estadoActual === 'Hecho' ? 'Pendiente' : 'Hecho';
-                await db.collection('planes').doc(plan.id).set({
-                    resenas: { [user.uid]: { nombre: user.displayName.split(' ')[0], puntaje: plan.resenas?.[user.uid]?.puntaje || 5, comentario: plan.resenas?.[user.uid]?.comentario || '', fotoUrl: plan.resenas?.[user.uid]?.fotoUrl || '', estado: nuevoEstado } }
-                }, { merge: true });
+                const ahora = Date.now();
+                
+                const updateData = {
+                    resenas: { 
+                        [user.uid]: { 
+                            nombre: user.displayName.split(' ')[0], 
+                            puntaje: plan.resenas?.[user.uid]?.puntaje || 5, 
+                            comentario: plan.resenas?.[user.uid]?.comentario || '', 
+                            fotoUrl: plan.resenas?.[user.uid]?.fotoUrl || '', 
+                            estado: nuevoEstado 
+                        } 
+                    }
+                };
+
+                // Guarda la marca de tiempo exacta en que se marcó como Hecho
+                if (nuevoEstado === 'Hecho') {
+                    updateData.fechaHecho = ahora;
+                }
+
+                await db.collection('planes').doc(plan.id).set(updateData, { merge: true });
                 mostrarToast(nuevoEstado === 'Hecho' ? '¡Plan marcado como Hecho! ✅' : 'Plan marcado como Pendiente ⏳');
-                if (planSeleccionado?.id === plan.id) setPlanSeleccionado(prev => ({ ...prev, resenas: { ...prev.resenas, [user.uid]: { ...prev.resenas?.[user.uid], estado: nuevoEstado } } }));
+                
+                if (planSeleccionado?.id === plan.id) {
+                    setPlanSeleccionado(prev => ({ 
+                        ...prev, 
+                        ...(nuevoEstado === 'Hecho' ? { fechaHecho: ahora } : {}),
+                        resenas: { 
+                            ...prev.resenas, 
+                            [user.uid]: { ...prev.resenas?.[user.uid], estado: nuevoEstado } 
+                        } 
+                    }));
+                }
             };
 
             const guardarResena = async (e) => {
@@ -474,7 +501,8 @@
                                     const foto = resenasArr.find(r => r.fotoUrl)?.fotoUrl;
                                     return (
                                         <div key={plan.id} onClick={() => { setPlanSeleccionado(plan); setVistaActual('detalle'); }} className="soft-card p-5 rounded-[2.5rem] cursor-pointer active:scale-98 transition-all space-y-3">
-                                            <div className="flex justify-between items-center"><span className="text-[10px] text-[#A3928E] bg-[#F7EFEA] px-2.5 py-1 rounded-full font-bold">{calcularDias(plan.fechaCreacion)}</span><span className="text-xl">{catRecuerdo.icono}</span></div>
+                                            {/* Etiqueta actualizada para mostrar hace cuánto se cumplió el plan */}
+                                            <div className="flex justify-between items-center"><span className="text-[10px] text-[#A3928E] bg-[#F7EFEA] px-2.5 py-1 rounded-full font-bold">{calcularDias(plan.fechaHecho || plan.fechaCreacion)}</span><span className="text-xl">{catRecuerdo.icono}</span></div>
                                             <div><h3 className="font-bold text-[#4A3E3D] text-lg">{plan.titulo}</h3><p className="text-xs text-[#8C7A78]">{catRecuerdo.titulo}</p></div>
                                             {foto && (
                                                 <img
